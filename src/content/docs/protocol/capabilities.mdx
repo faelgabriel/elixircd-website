@@ -1,0 +1,205 @@
+---
+title: IRCv3 Capabilities
+description: Complete reference for all IRCv3 capabilities supported by ElixIRCd.
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+ElixIRCd supports modern IRC client features through the IRCv3 capability negotiation system. Capabilities are negotiated during the connection handshake using the `CAP` command.
+
+## Capability Negotiation Flow
+
+```
+Client: CAP LS 302
+Server: CAP * LS :SASL=PLAIN EXTENDED-JOIN AWAY-NOTIFY MESSAGE-TAGS SERVER-TIME ...
+Client: CAP REQ :EXTENDED-JOIN AWAY-NOTIFY MULTI-PREFIX
+Server: CAP * ACK :EXTENDED-JOIN AWAY-NOTIFY MULTI-PREFIX
+Client: CAP END
+```
+
+## Supported Capabilities
+
+### SASL (`sasl`)
+
+SASL authentication before registration completes.
+
+- Announced as: `SASL=PLAIN` (since PLAIN is the only supported mechanism)
+- Non-requestable via `CAP REQ SASL` alone — use `SASL=PLAIN`
+- Actually: `SASL=PLAIN` is the full cap value; clients request it as `SASL`
+
+**Purpose:** Allows authentication using SASL PLAIN before the connection registration completes. See [SASL Authentication](/protocol/sasl/).
+
+### ACCOUNT-TAG (`account-tag`)
+
+Attaches the authenticated account name to messages via message tags.
+
+**When active:** Messages from identified users include `account=AccountName` in their tag list.
+
+**Example:**
+```
+@account=Alice :Alice!alice@host PRIVMSG #channel :Hello!
+```
+
+### ACCOUNT-NOTIFY (`account-notify`)
+
+Sends notifications when users in shared channels identify or log out.
+
+**When a user identifies:**
+```
+:Alice!alice@host ACCOUNT AliceAccount
+```
+
+**When a user logs out:**
+```
+:Alice!alice@host ACCOUNT *
+```
+
+### AWAY-NOTIFY (`away-notify`)
+
+Real-time notifications when users in shared channels set or remove their away status.
+
+**When a user sets away:**
+```
+:Alice!alice@host AWAY :Out for lunch
+```
+
+**When a user clears away:**
+```
+:Alice!alice@host AWAY
+```
+
+### CAP-NOTIFY (`cap-notify`)
+
+Notifies clients when server capabilities change dynamically (e.g., after REHASH).
+
+### CHGHOST (`chghost`)
+
+Notifies users in shared channels when someone's hostname changes (e.g., via `+x` mode or `CHGHOST`).
+
+**Format:**
+```
+:Alice!oldident@oldhostname CHGHOST newident newhostname
+```
+
+### CLIENT-TAGS (`client-tags`)
+
+Allows clients to attach vendor-specific client-only tags to messages. These tags are forwarded to other clients but not interpreted by the server.
+
+**Format:** Tags prefixed with `+` are client-only:
+```
+@+typing=active TAGMSG #channel
+```
+
+### EXTENDED-JOIN (`extended-join`)
+
+Adds account name and real name to JOIN messages.
+
+**Standard JOIN:**
+```
+:Alice!alice@host JOIN #channel
+```
+
+**Extended JOIN:**
+```
+:Alice!alice@host JOIN #channel AliceAccount :Alice's Real Name
+```
+
+The account field is `*` if the user is not identified.
+
+### INVITE-EXTENDED (`invite-extended`)
+
+Adds account information to INVITE messages.
+
+### INVITE-NOTIFY (`invite-notify`)
+
+When a user is invited to a channel, other channel members receive a notification:
+```
+:Alice!alice@host INVITE Bob #channel
+```
+
+(Sent to all channel members with this capability)
+
+### MULTI-PREFIX (`multi-prefix`)
+
+Displays all status prefixes for users in NAMES replies and similar responses.
+
+**Without MULTI-PREFIX:**
+```
+@Alice   ← shows only highest prefix
+```
+
+**With MULTI-PREFIX:**
+```
+@+Alice  ← shows all prefixes (op and voice)
+```
+
+### MESSAGE-TAGS (`message-tags`)
+
+Full IRCv3 message tag support. Enables the use of message tags for metadata attachment.
+
+Enables:
+- `SERVER-TIME` tags (`time=`)
+- `MSGID` tags (`msgid=`)
+- `ACCOUNT-TAG` tags (`account=`)
+- Bot tags (`+draft/bot`)
+- Client-only tags (`+vendor/name`)
+
+### SERVER-TIME (`server-time`)
+
+Adds a `time=` tag to every message with the server's timestamp in ISO 8601 format.
+
+**Example:**
+```
+@time=2024-01-15T14:30:00.000Z :Alice!alice@host PRIVMSG #channel :Hello!
+```
+
+### MSGID (`msgid`)
+
+Adds a unique `msgid=` tag to every message.
+
+**Example:**
+```
+@msgid=abc123xyz456 :Alice!alice@host PRIVMSG #channel :Hello!
+```
+
+### MONITOR (`monitor`)
+
+Efficient user tracking. Track when specific nicknames go online or offline.
+
+See [MONITOR command](/commands/ircv3/#monitor).
+
+### SETNAME (`setname`)
+
+Allows clients to change their real name (GECOS) during an active session.
+
+### UHNAMES / extended-names (`uhnames`)
+
+Extended NAMES reply — nicks are shown as `nick!ident@host` instead of just `nick`.
+
+### EXTENDED-UHLIST (`extended-uhlist`)
+
+Extended user modes in WHO replies.
+
+### STS (`sts`)
+
+Strict Transport Security. Announces TLS upgrade policy.
+
+- **Plaintext connections:** `sts=port=6697`
+- **TLS connections:** `sts=duration=2592000`
+
+**Non-requestable** — informational only.
+
+## Not Implemented
+
+| Capability | Status |
+|-----------|--------|
+| `batch` | Not implemented |
+| `echo-message` | Not implemented |
+| `labeled-response` | Not implemented |
+| `standard-replies` | Not implemented |
+
+<Aside type="note">
+  The BATCH capability and associated features (message history replay, etc.) are not implemented in ElixIRCd. For server-side message history, use ChanServ or an external bouncer.
+</Aside>

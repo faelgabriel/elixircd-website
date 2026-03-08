@@ -1,0 +1,85 @@
+---
+title: Hostname Cloaking
+description: Configuring hostname cloaking to protect user privacy.
+sidebar:
+  order: 5
+---
+
+## Cloaking Block
+
+```elixir
+cloaking: [
+  enabled: true,
+  cloak_keys: [
+    "SecretKey1Random30PlusCharactersGoesHere!!",
+    "SecretKey2Random30PlusCharactersGoesHere!!",
+    "SecretKey3Random30PlusCharactersGoesHere!!"
+  ],
+  cloak_prefix: "elixir",
+  cloak_on_connect: false,
+  cloak_allow_disable: true,
+  cloak_domain_parts: 2
+]
+```
+
+## Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `true` | Enable hostname cloaking feature |
+| `cloak_keys` | (example keys) | Secret keys for HMAC-based cloaking |
+| `cloak_prefix` | `"elixir"` | Prefix for cloaked hostnames |
+| `cloak_on_connect` | `false` | Auto-enable `+x` when users connect |
+| `cloak_allow_disable` | `true` | Allow users to remove `+x` mode |
+| `cloak_domain_parts` | `2` | Number of domain segments to preserve |
+
+## How Cloaking Works
+
+Hostname cloaking replaces a user's real hostname with a deterministic but opaque hash. The algorithm:
+
+1. Takes the user's real IP address and resolved hostname
+2. Computes an HMAC hash using the configured `cloak_keys`
+3. Produces a hostname like: `elixir-A3F2B1C8.isp.com`
+
+The hash is **deterministic** — the same real hostname always produces the same cloak. This means:
+- Bans on cloaked hostnames still work (same user = same cloak)
+- But different users from the same ISP get different cloaks (based on their specific address)
+
+## Cloak Keys
+
+The keys must be:
+- At least 3 keys (for rotation capability)
+- At least 30 characters each
+- Kept **secret** — anyone with these keys can reverse-engineer which real addresses map to which cloaks
+
+To generate secure keys:
+```elixir
+# In iex or docker exec remote shell
+:crypto.strong_rand_bytes(32) |> Base.encode64()
+```
+
+Run this command 3 times to get 3 unique keys.
+
+**Key rotation:** You can add new keys and remove old ones without breaking existing bans, because the system uses multiple keys and bans match against any of them.
+
+## Cloak Examples
+
+With `cloak_prefix: "elixir"` and `cloak_domain_parts: 2`:
+
+| Real hostname | Cloaked hostname |
+|--------------|-----------------|
+| `192.168.1.100` | `elixir-A3F2B1C8.home.example.com` |
+| `user.isp.net` | `elixir-B7D3F1A2.isp.net` |
+| `2001:db8::1` | `elixir-C9E5A7D1.ipv6.example.org` |
+
+The last `cloak_domain_parts` segments of the original hostname are preserved.
+
+## Auto-Cloaking on Connect
+
+If `cloak_on_connect: true`, users automatically get the `+x` (Cloaked) mode during the connection handshake. This means their hostname is cloaked before they join any channels.
+
+## Preventing Disabling
+
+If `cloak_allow_disable: false`, users cannot remove their `+x` mode — their hostname is always cloaked. This is useful on privacy-focused networks.
+
+See also [Hostname Cloaking (Security)](/security/cloaking/) for the user-facing perspective.

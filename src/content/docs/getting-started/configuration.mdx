@@ -1,0 +1,135 @@
+---
+title: Initial Configuration
+description: Essential configuration to get started with ElixIRCd.
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+ElixIRCd is configured via a single Elixir config file: `elixircd.exs`. This file uses standard Elixir `Config` syntax.
+
+The full configuration reference is in [Configuration Overview](/configuration/overview/). This page covers the minimum you need to get started.
+
+## Minimal Configuration
+
+```elixir title="elixircd.exs"
+import Config
+
+config :elixircd,
+  server: [
+    name: "My IRC Network",
+    hostname: "irc.example.com",
+    password: nil,
+    motd: File.read("config/motd.txt")
+  ],
+  listeners: [
+    {:tcp, [port: 6667]},
+    {:tls, [
+      port: 6697,
+      transport_options: [
+        keyfile: Path.expand("data/cert/selfsigned_key.pem"),
+        certfile: Path.expand("data/cert/selfsigned.pem")
+      ]
+    ]},
+    {:http, [port: 8080]},
+    {:https, [
+      port: 8443,
+      keyfile: Path.expand("data/cert/selfsigned_key.pem"),
+      certfile: Path.expand("data/cert/selfsigned.pem")
+    ]}
+  ],
+  operators: [
+    # Add at least one operator for admin access
+    # Password must be hashed with Argon2id
+    # {"admin", "$argon2id$v=19$m=4096,t=2,p=4$..."}
+  ]
+```
+
+## Setting Up an IRC Operator
+
+To become an IRC operator on your server, you need to add a credential entry to the `operators` list. Passwords must be hashed with **Argon2id**.
+
+### Generating a Password Hash
+
+In an Elixir shell (`iex -S mix` or `docker exec -it <container> ./bin/elixircd remote`):
+
+```elixir
+Argon2.hash_pwd_salt("your_secure_password")
+```
+
+This outputs something like:
+```
+"$argon2id$v=19$m=4096,t=2,p=4$aBcDeFgH...$hash..."
+```
+
+Copy that hash into your config:
+
+```elixir
+operators: [
+  {"admin", "$argon2id$v=19$m=4096,t=2,p=4$aBcDeFgH...$hash..."}
+]
+```
+
+To use it, connect to the server and run:
+
+```irc
+/oper admin your_secure_password
+```
+
+<Aside type="caution">
+  Never store plaintext passwords in `operators`. Always use Argon2id hashes. The example hash in the default config is for the password `"admin"` — change it before deploying!
+</Aside>
+
+## Message of the Day (MOTD)
+
+Create a `motd.txt` file with your server's welcome message:
+
+```text title="motd.txt"
+Welcome to My IRC Network!
+
+Rules:
+- Be respectful
+- No spam
+- Have fun!
+
+Contact: admin@example.com
+```
+
+The MOTD is shown to users when they connect and when they run `/motd`.
+
+## Hostname Cloaking Keys
+
+If you enable hostname cloaking (default: enabled), generate proper secret keys:
+
+```elixir
+:crypto.strong_rand_bytes(32) |> Base.encode64()
+```
+
+Run this three times to get three unique keys:
+
+```elixir
+cloaking: [
+  enabled: true,
+  cloak_keys: [
+    "XYZ...(32+ chars)...",
+    "ABC...(32+ chars)...",
+    "DEF...(32+ chars)..."
+  ],
+  cloak_prefix: "elixir",
+  cloak_on_connect: false,
+  cloak_allow_disable: true,
+  cloak_domain_parts: 2
+]
+```
+
+<Aside type="caution">
+  Keep your cloaking keys secret. Anyone with these keys can reverse-engineer cloaked hostnames. Use multiple keys to allow rotation without breaking existing bans.
+</Aside>
+
+## Next Steps
+
+- [Full configuration reference](/configuration/overview/)
+- [SSL/TLS certificate setup](/getting-started/tls-setup/)
+- [Rate limiting configuration](/configuration/rate-limiting/)
+- [Services configuration](/configuration/services/)

@@ -1,0 +1,107 @@
+---
+title: Rate Limiting & Flood Protection
+description: How ElixIRCd protects against floods and abuse.
+sidebar:
+  order: 2
+---
+
+ElixIRCd has built-in flood protection at multiple levels.
+
+## Connection Flood Protection
+
+At the TCP layer, before any IRC commands are processed:
+
+1. **Max connections per IP** — prevents a single IP from opening too many connections
+2. **Connection rate throttle** — token bucket limits how fast an IP can make new connections
+3. **Violation tracking** — repeated violations lead to IP blocking
+
+See [Rate Limiting Configuration](/configuration/rate-limiting/) for all parameters.
+
+## Message Flood Protection
+
+After a user is connected, their message rate is monitored:
+
+1. **Global message throttle** — each user gets a token bucket
+2. **Per-command overrides** — stricter limits for high-impact commands (e.g., JOIN)
+3. **Disconnect on threshold** — excessive violations disconnect the user
+
+### Default Limits
+
+With default settings:
+- A user can send up to **40 messages in a burst** (bucket capacity)
+- Sustained rate is **2 messages per second**
+- After **10 throttle violations** within 60 seconds, the user is disconnected
+
+### Configuring Per-Command Limits
+
+To impose stricter limits on JOIN:
+```elixir
+command_throttle: %{
+  "JOIN" => [refill_rate: 0.5, capacity: 5, cost: 1, disconnect_threshold: 3]
+}
+```
+
+## Channel Join Throttle (+j)
+
+Individual channels can enforce their own join rate limits with the `+j` mode:
+
+```irc
+MODE #channel +j 5:60    # Max 5 joins per 60 seconds
+```
+
+IRC operators bypass channel join throttle.
+
+## Inactivity Timeout
+
+Users who don't send any messages for `inactivity_timeout_ms` (default: 3 minutes) are disconnected. This prevents ghost connections from accumulating.
+
+## Message Delay (+d)
+
+Channels can require a delay before new users can speak:
+
+```irc
+MODE #channel +d 30    # 30 second delay for new joiners
+```
+
+This prevents "join-flood-spam" patterns.
+
+## Channel Message Restrictions
+
+Channel modes that prevent flood-related abuse:
+
+| Mode | Protection |
+|------|-----------|
+| `+m` | Only voiced/opped users can speak |
+| `+C` | No CTCP messages |
+| `+c` | No color codes (anti-color-flood) |
+| `+T` | No NOTICE messages |
+| `+M` | Only registered users can speak |
+| `+d` | Delay before new users can speak |
+| `+j` | Limit join rate |
+
+## Exemptions
+
+Both connection and message rate limiters support exemptions for trusted sources:
+
+```elixir
+# Connection exemptions
+rate_limiter: [
+  connection: [
+    exceptions: [
+      ips: ["127.0.0.1", "::1"],
+      cidrs: ["10.0.0.0/8"]
+    ]
+  ]
+]
+
+# Message exemptions
+rate_limiter: [
+  message: [
+    exceptions: [
+      nicknames: ["TrustedBot"],
+      masks: ["*!*@trusted.service.org"],
+      umodes: ["o"]  # Exempt IRC operators
+    ]
+  ]
+]
+```

@@ -1,0 +1,159 @@
+---
+title: Rate Limiting
+description: Configuring connection and message rate limiting in ElixIRCd.
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+ElixIRCd uses a **token bucket** algorithm for rate limiting, implemented via the [Hammer](https://hexdocs.pm/hammer/) library. There are two separate rate limiters: one for connections and one for messages.
+
+## Rate Limiter Block
+
+```elixir
+rate_limiter: [
+  connection: [
+    max_connections_per_ip: 100,
+    throttle: [
+      refill_rate: 0.5,
+      capacity: 20,
+      cost: 3,
+      window_ms: 60_000,
+      block_threshold: 10,
+      block_ms: 60_000
+    ],
+    exceptions: [
+      ips: ["127.0.0.1", "::1"],
+      cidrs: []
+    ]
+  ],
+  message: [
+    throttle: [
+      refill_rate: 2.0,
+      capacity: 40,
+      cost: 1,
+      window_ms: 60_000,
+      disconnect_threshold: 10
+    ],
+    command_throttle: %{},
+    exceptions: [
+      nicknames: [],
+      masks: [],
+      umodes: []
+    ]
+  ]
+]
+```
+
+## Connection Rate Limiting
+
+Controls how frequently new connections can be made from the same IP.
+
+### max_connections_per_ip
+
+Maximum number of **simultaneously open** connections from the same IP address.
+
+```elixir
+max_connections_per_ip: 100    # Default
+```
+
+Connections exceeding this limit are rejected before even completing the TCP handshake.
+
+### Connection Throttle
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `refill_rate` | `0.5` | Tokens added per second. Controls how fast the bucket refills. |
+| `capacity` | `20` | Maximum tokens in bucket. Allows burst connections. |
+| `cost` | `3` | Tokens consumed per connection. |
+| `window_ms` | `60_000` | Violation tracking window in milliseconds. |
+| `block_threshold` | `10` | Number of violations before blocking the IP. |
+| `block_ms` | `60_000` | How long (ms) to block the IP after threshold is exceeded. |
+
+**How it works:**
+1. Each connection attempt costs `cost` tokens from the bucket
+2. If the bucket doesn't have enough tokens, the connection is throttled
+3. Each throttle event is counted as a violation
+4. After `block_threshold` violations in `window_ms`, the IP is blocked for `block_ms`
+
+**With defaults:** An IP can make ~10 burst connections immediately (capacity 20 ÷ cost 3), then is limited to one connection every 6 seconds (1 ÷ 0.5 × 3 = 6s per connection).
+
+### Connection Exceptions
+
+IPs or CIDR ranges exempt from connection rate limiting:
+
+```elixir
+exceptions: [
+  ips: ["127.0.0.1", "::1"],
+  cidrs: ["10.0.0.0/8", "192.168.0.0/16"]
+]
+```
+
+Localhost addresses are exempt by default, which is useful for local services.
+
+## Message Rate Limiting
+
+Controls how frequently users can send messages.
+
+### Message Throttle
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `refill_rate` | `2.0` | Tokens added per second. |
+| `capacity` | `40` | Maximum tokens. Allows burst messages. |
+| `cost` | `1` | Tokens per message. |
+| `window_ms` | `60_000` | Violation tracking window (ms). |
+| `disconnect_threshold` | `10` | Violations before disconnecting the user. |
+
+**With defaults:** A user can send up to 40 messages instantly (burst), then is limited to 2 messages per second. After 10 violations (throttle events) within 60 seconds, they are disconnected.
+
+### Per-Command Throttle Overrides
+
+You can set different throttle limits for specific commands:
+
+```elixir
+command_throttle: %{
+  "JOIN" => [refill_rate: 0.5, capacity: 20, cost: 5, disconnect_threshold: 5],
+  "NICK" => [refill_rate: 0.3, capacity: 5, cost: 1, disconnect_threshold: 3]
+}
+```
+
+This is useful to impose stricter limits on flood-prone commands like JOIN.
+
+### Message Exceptions
+
+Users exempt from message rate limiting:
+
+```elixir
+exceptions: [
+  # Identified nicknames exempt from rate limiting
+  nicknames: ["TrustedBot", "ServiceUser"],
+  # Host masks exempt from rate limiting
+  masks: ["*!*@localhost", "*!*@trusted.gateway.org"],
+  # Users with specific modes exempt (e.g., IRC operators)
+  umodes: ["o"]  # Operators are exempt
+]
+```
+
+| Type | Matching |
+|------|---------|
+| `nicknames` | The user's current `identified_as` account name (case-insensitive) |
+| `masks` | Matches against `nick!ident@hostname` using wildcard patterns |
+| `umodes` | If the user has any of these modes set |
+
+<Aside type="tip">
+  Add `umodes: ["o"]` to exempt IRC operators from message rate limiting. This prevents operators from accidentally being throttled while doing network management.
+</Aside>
+
+## Rate Limiting Behavior
+
+**Throttled (not exceeded):** The user receives an indication that they should slow down but is not disconnected.
+
+**Threshold exceeded:** The user is disconnected for exceeding the rate limit repeatedly.
+
+**IP blocked (connection limiter):** New connections from the IP are rejected for `block_ms` milliseconds.
+
+<Aside type="note">
+  The rate limiter state is stored in ETS (in-memory). Restarting the server resets all rate limiting state.
+</Aside>

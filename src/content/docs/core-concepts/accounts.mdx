@@ -1,0 +1,170 @@
+---
+title: Accounts & Registration
+description: How nickname and channel registration works in ElixIRCd via NickServ and ChanServ.
+sidebar:
+  order: 5
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Overview
+
+ElixIRCd has a built-in account system through its integrated **NickServ** service. Accounts are tied to **registered nicknames**.
+
+Key concepts:
+- An **account** is a registered nickname with a password
+- One account per nickname (no grouping in the current version)
+- Accounts expire after 90 days of inactivity (configurable)
+- Accounts survive server restarts **only if** Mnesia is configured with disk persistence
+
+## Registering a Nickname
+
+```irc
+/msg NickServ REGISTER <password> [email]
+```
+
+Example:
+```irc
+/msg NickServ REGISTER mysecretpass user@example.com
+```
+
+Requirements:
+- Password minimum length: 6 characters (configurable)
+- Email: optional by default (configurable as required)
+- Connection age: server may require you to be connected for a minimum time (`wait_register_time`, default: 120 seconds)
+
+If email is provided and email verification is configured, you'll receive a verification code. Verify with:
+```irc
+/msg NickServ VERIFY <nickname> <code>
+```
+
+<Aside type="note">
+  If `email_required: false` (the default), you can register without an email. In that case, no verification is needed and the nick is immediately active.
+</Aside>
+
+## Identifying (Logging In)
+
+Once registered, identify yourself each time you connect:
+
+```irc
+# Using your current nick (if it matches the registered nick)
+/msg NickServ IDENTIFY <password>
+
+# Using a different nick
+/msg NickServ IDENTIFY <registered_nick> <password>
+```
+
+After successful identification:
+- Your user mode changes to `+r` (Registered)
+- Your `identified_as` is set to the registered nickname
+- Clients with `ACCOUNT-NOTIFY` will see your account name
+
+## SASL Authentication (Pre-Registration)
+
+A better approach is **SASL PLAIN** authentication, which logs you in *before* your connection completes. Configure this in your IRC client using the `SASL` mechanism `PLAIN` with your registered nickname and password.
+
+See [SASL Authentication](/protocol/sasl/) for details.
+
+## Logging Out
+
+```irc
+/msg NickServ LOGOUT
+```
+
+This removes the `+r` mode and clears your identification. Does **not** disconnect you.
+
+<Aside type="note">
+  If you authenticated via SASL, you'll see a message saying to use LOGOUT before re-identifying with IDENTIFY.
+</Aside>
+
+## Nick Protections
+
+When someone else is using your registered nickname:
+
+```irc
+# Disconnect the ghost (another session using your nick)
+/msg NickServ GHOST <nickname> <password>
+
+# Forcefully recover your nick and reserve it temporarily
+/msg NickServ RECOVER <nickname> <password>
+
+# Regain your nick from another user (reserves it temporarily)
+/msg NickServ REGAIN <nickname> <password>
+
+# Release a nick you've reserved (from REGAIN/RECOVER)
+/msg NickServ RELEASE <nickname>
+```
+
+**GHOST** — disconnects a connection that is using your nick with the message "This nickname is owned by someone else".
+
+**RECOVER** — disconnects the other user using your nick and **reserves it** for `recover_reservation_duration` seconds (default: 60s). During this time, only you can claim the nick.
+
+**REGAIN** — similar to RECOVER but also changes your current nick to the recovered nick immediately.
+
+**RELEASE** — releases a reserved nickname before the reservation expires.
+
+## Dropping a Nickname
+
+```irc
+/msg NickServ DROP <nickname> <password>
+```
+
+Permanently removes the registration. This cannot be undone.
+
+## Account Settings
+
+Adjust your account settings with NickServ SET:
+
+```irc
+/msg NickServ SET HIDEMAIL ON   # Hide your email in NickServ INFO
+/msg NickServ SET HIDEMAIL OFF  # Show your email in NickServ INFO
+```
+
+## Access Lists
+
+The access list allows automatic identification from trusted hostmasks:
+
+```irc
+/msg NickServ ACCESS ADD *!*@trusted.host.com
+/msg NickServ ACCESS DEL *!*@trusted.host.com
+/msg NickServ ACCESS LIST
+```
+
+Users connecting from a hostmask that matches an entry in the access list are automatically identified without needing to provide a password.
+
+## Checking Registration Status
+
+```irc
+# Check if a nick is registered (and if you're identified)
+/msg NickServ STATUS [nickname1 nickname2 ...]
+```
+
+Returns a status for each nick:
+- `0` — Not registered
+- `1` — Registered but not currently online
+- `2` — Online but not identified
+- `3` — Online and identified
+
+## Viewing Account Info
+
+```irc
+/msg NickServ INFO <nickname>
+```
+
+Shows: registration date, last seen date, email (unless hidden), and other details.
+
+## The `+r` Mode and Channel Access
+
+Several channel modes interact with account registration:
+
+| Mode | Effect |
+|------|--------|
+| `+R` (channel) | Only registered users (`+r`) may join |
+| `+M` (channel) | Only registered users may speak |
+| `+R` (user) | Only registered users may PRIVMSG you |
+
+Users without `+r` cannot join `+R` channels or speak in `+M` channels.
+
+## Channel Registration
+
+See the [ChanServ documentation](/services/chanserv/) for channel registration details.

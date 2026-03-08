@@ -1,0 +1,196 @@
+---
+title: User Information Commands
+description: Commands for looking up information about users and the server.
+sidebar:
+  order: 5
+---
+
+## WHOIS
+
+Get detailed information about a connected user.
+
+**Syntax:** `WHOIS <nickname>`
+
+**Response includes:**
+- Nickname, ident, hostname, real name
+- Channels they are in (unless hidden by `+i` or `+p`)
+- Server they are connected to
+- Whether they are an IRC operator
+- Whether they are away (and away message)
+- Whether they are identified with NickServ (`+r` mode)
+- Whether connected via SSL/TLS (`+Z` mode)
+- Account name (if identified)
+- Idle time and sign-on time
+
+**Behavior:**
+- If the target has `+i` (Invisible), channels are hidden unless you share a channel with them
+- If the target has `+p` (Hide channels), channels are hidden unless you share a channel
+- If the target has `+H` (Hide Operator), IRC op status is hidden from non-operators
+- IRC operators can always see full information
+
+**Example:**
+```irc
+WHOIS Alice
+```
+
+---
+
+## WHO
+
+Search for users matching criteria.
+
+**Syntax:** `WHO <mask> [o]`
+
+**Behavior:**
+- Returns users matching the mask (supports wildcards `*` and `?`)
+- `o` flag: only return IRC operators
+- Users with `+i` (Invisible) are only shown if you share a channel with them
+
+**Examples:**
+```irc
+WHO #general           # List users in #general
+WHO Alice              # Info about Alice
+WHO *@192.168.*        # Users with matching hostname
+WHO * o                # All IRC operators
+```
+
+---
+
+## WHOWAS
+
+Get information about a user who has recently disconnected.
+
+**Syntax:** `WHOWAS <nickname> [<count> [<server>]]`
+
+**Behavior:**
+- Returns historical user information from the WHOWAS database
+- Shows: nickname, ident, hostname, real name, and when they were last seen
+
+**Example:**
+```irc
+WHOWAS Alice
+WHOWAS Alice 5   # Show up to 5 entries
+```
+
+---
+
+## USERHOST
+
+Get hostmask information for one or more nicknames.
+
+**Syntax:** `USERHOST <nick1> [<nick2> ... <nick5>]`
+
+**Behavior:**
+- Returns up to 5 nicknames with their ident and hostname
+- Format: `nick[*]=+hostmask` (the `*` indicates IRC operator)
+
+**Example:**
+```irc
+USERHOST Alice Bob
+```
+
+Response:
+```
+:server 302 yournick :Alice=+alice@user.example.com Bob=+bob@bob.host.org
+```
+
+---
+
+## USERS
+
+List users currently connected to the server.
+
+**Syntax:** `USERS`
+
+**Behavior:**
+- Returns a list of connected users with their ident and hostname
+- Users with `+i` (Invisible) may not be shown
+
+---
+
+## ISON
+
+Check if one or more users are currently online.
+
+**Syntax:** `ISON <nick1> [<nick2> ...]`
+
+**Behavior:**
+- Returns a space-separated list of the provided nicknames that are currently connected
+- Does not check registration or identification status
+
+**Example:**
+```irc
+ISON Alice Bob Charlie
+```
+
+Response (only Alice and Charlie are online):
+```
+:server 303 yournick :Alice Charlie
+```
+
+---
+
+## LUSERS
+
+Get statistics about the number of users and channels on the server.
+
+**Syntax:** `LUSERS`
+
+**Returns:**
+- Number of users (visible and invisible)
+- Number of IRC operators
+- Number of channels
+- Number of clients connected to this server
+
+**Response numerics:**
+- `251 RPL_LUSERCLIENT` — "There are X users and Y invisible on Z servers"
+- `252 RPL_LUSEROP` — "X IRC Operators online"
+- `253 RPL_LUSERUNKNOWN` — "X unknown connection(s)"
+- `254 RPL_LUSERCHANNELS` — "X channels formed"
+- `255 RPL_LUSERME` — "I have X clients and 1 servers"
+
+---
+
+## ACCEPT
+
+Manage your Caller ID accept list. This controls who can PRIVMSG you when you have `+g` (Caller ID) mode set.
+
+**Syntax:**
+- `ACCEPT +<nick>` — add a user to your accept list
+- `ACCEPT -<nick>` — remove a user from your accept list
+- `ACCEPT *` — list your current accept list
+
+**Behavior:**
+- When you have `+g` set, only users on your ACCEPT list can send you private messages
+- Users not on your list who try to PRIVMSG you get an error; you receive a notification (once per session per sender)
+- Accepts do not persist between sessions — your accept list is cleared on disconnect
+
+**Examples:**
+```irc
+ACCEPT +Alice         # Allow Alice to message you
+ACCEPT -Bob           # Remove Bob from your list
+ACCEPT *              # View your accept list
+```
+
+---
+
+## SILENCE
+
+Manage your silence list. Users on your silence list cannot send you messages.
+
+**Syntax:**
+- `SILENCE +<mask>` — add a hostmask to your silence list
+- `SILENCE -<mask>` — remove from silence list
+- `SILENCE` — list your silence entries
+
+**Behavior:**
+- Unlike ACCEPT, SILENCE blocks based on hostmasks (not just nicknames)
+- Messages from matching users are silently dropped — they receive no error
+- Persists for the session only (not saved across disconnects)
+
+**Examples:**
+```irc
+SILENCE +*!*@spammer.host   # Silence all users from spammer.host
+SILENCE -*!*@spammer.host   # Remove the silence
+SILENCE                     # View your silence list
+```

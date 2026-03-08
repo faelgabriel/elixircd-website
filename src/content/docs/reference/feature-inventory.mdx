@@ -1,0 +1,281 @@
+---
+title: Feature Inventory
+description: Complete list of all implemented features in ElixIRCd, derived from source code audit.
+sidebar:
+  order: 4
+---
+
+This page is a complete inventory of ElixIRCd features derived from a direct source code audit. It reflects what is actually implemented, not just what is planned.
+
+## IRC Commands
+
+### Connection & Registration
+
+| Command | Description |
+|---------|-------------|
+| `CAP` | Capability negotiation (LS, REQ, ACK, END, LIST, NEW, DEL) |
+| `NICK` | Set or change nickname |
+| `USER` | Set username and real name |
+| `PASS` | Set connection password |
+| `OPER` | Obtain IRC operator status |
+| `QUIT` | Disconnect from server |
+| `WEBIRC` | Set real IP for WebSocket/proxy connections |
+| `AUTHENTICATE` | SASL authentication exchange |
+
+### Channel
+
+| Command | Description |
+|---------|-------------|
+| `JOIN` | Join one or more channels |
+| `PART` | Leave a channel |
+| `KICK` | Remove a user from a channel |
+| `INVITE` | Invite a user to an invite-only channel |
+| `TOPIC` | Get or set the channel topic |
+| `MODE` | Get or set user/channel modes |
+| `NAMES` | List users in a channel |
+| `LIST` | List channels matching a pattern |
+
+### Messaging
+
+| Command | Description |
+|---------|-------------|
+| `PRIVMSG` | Send a message to a user or channel |
+| `NOTICE` | Send a notice to a user or channel |
+| `TAGMSG` | Send a message-tags-only message |
+
+### User Information
+
+| Command | Description |
+|---------|-------------|
+| `WHOIS` | Get information about a user |
+| `WHOWAS` | Get information about a recently disconnected nick |
+| `WHO` | List users matching a mask |
+| `AWAY` | Set or clear away status |
+| `USERHOST` | Get hostmask for up to 5 nicks |
+| `SETNAME` | Change real name during session |
+| `ISON` | Check if nicks are online |
+
+### Operator
+
+| Command | Description |
+|---------|-------------|
+| `KILL` | Disconnect a user from the server |
+| `OPERWALL` | Broadcast message to all IRC operators |
+| `WALLOPS` | Broadcast message to users with `+w` mode |
+| `GLOBOPS` | Broadcast to all operators |
+| `CHGHOST` | Change a user's visible hostname |
+| `REHASH` | Reload server configuration |
+| `RESTART` | Restart the server process |
+| `DIE` | Shut down the server process |
+
+### Server Information
+
+| Command | Description |
+|---------|-------------|
+| `PING` | Keepalive ping |
+| `PONG` | Keepalive reply |
+| `VERSION` | Get server version information |
+| `INFO` | Get server build/info string |
+| `ADMIN` | Get administrator contact info |
+| `LUSERS` | Get user/channel/server counts |
+| `MOTD` | Get the message of the day |
+| `STATS` | Get server statistics |
+| `TIME` | Get server time |
+
+### IRCv3 / Modern
+
+| Command | Description |
+|---------|-------------|
+| `MONITOR` | Track user presence (add, remove, list, status, clear) |
+
+---
+
+## User Modes
+
+| Mode | Flag | Description |
+|------|------|-------------|
+| Bot | `+B` | Marks user as a bot |
+| Caller ID | `+g` | Only receive messages from known users |
+| Hidden Oper | `+H` | Hides operator status from non-operators |
+| Invisible | `+i` | Not shown in `/who` without specific match |
+| IRC Operator | `+o` | Server-level operator status |
+| Registered | `+r` | Authenticated to NickServ account (server-set) |
+| Registered Only | `+R` | Only registered users can message you |
+| Server Notices | `+s` | Receive server event notices |
+| Wallops | `+w` | Receive `/wallops` messages |
+| Cloaked | `+x` | Replace real hostname with HMAC-hashed cloak |
+| Secure | `+Z` | Connected via TLS (server-set) |
+
+---
+
+## Channel Modes
+
+### Flag Modes
+
+| Mode | Flag | Description |
+|------|------|-------------|
+| No CTCP | `+C` | Block CTCP messages in channel |
+| No Colors | `+c` | Strip/block color-formatted messages |
+| Invite Only | `+i` | Require invite to join |
+| Moderated | `+m` | Only voiced/opped users can speak |
+| Registered Only | `+M` | Only registered users can speak |
+| No External Messages | `+n` | Block messages from non-members |
+| IRC Oper Only | `+O` | Only IRC operators can join |
+| Private | `+p` | Channel is hidden from /list |
+| Registered | `+r` | Channel is registered (server-set) |
+| Registered Users Only | `+R` | Only registered users can join |
+| Secret | `+s` | Channel is hidden from /list and /whois |
+| Topic Lock | `+t` | Only ops can change the topic |
+| No NOTICE | `+T` | Block NOTICE messages in channel |
+| Auditorium | `+u` | Members only see ops in NAMES |
+| TLS Only | `+z` | Only TLS-connected users can join |
+
+### Value Modes
+
+| Mode | Flag | Value Format | Description |
+|------|------|-------------|-------------|
+| Message Delay | `+d` | seconds | New joiners must wait N seconds before speaking |
+| Join Throttle | `+j` | `rate:seconds` | Limit join rate (e.g., `5:60` = 5 joins per 60s) |
+| Key | `+k` | password | Channel password required to join |
+| Limit | `+l` | count | Maximum number of users |
+
+### List Modes
+
+| Mode | Flag | Description |
+|------|------|-------------|
+| Ban | `+b` | Ban hostmask from joining/speaking |
+| Exception | `+e` | Exempt hostmask from ban matching |
+| Invite Exception | `+I` | Allow hostmask to join invite-only channel |
+
+### Channel User Modes
+
+| Mode | Flag | Description |
+|------|------|-------------|
+| Op | `+o` | Channel operator status |
+| Voice | `+v` | Voice status (can speak in `+m` channels) |
+
+---
+
+## NickServ Commands
+
+| Command | Description |
+|---------|-------------|
+| `HELP` | Show help text |
+| `REGISTER` | Register current nickname with password |
+| `VERIFY` | Verify registration with emailed code |
+| `IDENTIFY` | Authenticate to registered account |
+| `LOGOUT` | Log out of current account |
+| `GHOST` | Disconnect a session using your nick |
+| `RECOVER` | Force-disconnect and reclaim your nick |
+| `REGAIN` | Reclaim nick (RECOVER + RELEASE combined) |
+| `RELEASE` | Release an enforced nick hold |
+| `DROP` | Delete your account registration |
+| `INFO` | Show account information |
+| `SET HIDEMAIL` | Hide/show email address in INFO |
+| `ACCESS ADD/DEL/LIST` | Manage trusted hostmasks for auto-login |
+| `ALIST` | List all channels where you have access |
+| `STATUS` | Check authentication status of a nick |
+
+---
+
+## ChanServ Commands
+
+| Command | Description |
+|---------|-------------|
+| `HELP` | Show help text |
+| `REGISTER` | Register current channel |
+| `DROP` | Delete channel registration |
+| `INFO` | Show channel registration info |
+| `SET` | Configure channel settings (see below) |
+| `TRANSFER` | Transfer channel ownership to another user |
+
+### ChanServ SET Options
+
+| Setting | Description |
+|---------|-------------|
+| `GUARD` | Have ChanServ join to keep channel alive |
+| `KEEPTOPIC` | Restore topic when channel re-forms |
+| `PRIVATE` | Hide channel info from non-members |
+| `RESTRICTED` | Block users not on access list from joining |
+| `FANTASY` | Enable `!op`, `!voice` etc. in channel |
+| `DESCRIPTION` / `DESC` | Set channel description |
+| `URL` | Set channel URL |
+| `EMAIL` | Set channel contact email |
+| `ENTRYMSG` | Set message sent to users on join |
+| `OPNOTICE` | Notify ops when members gain op/voice |
+| `PEACE` | Prevent lower-rank ops from acting on higher-rank |
+| `SECURE` | Require authentication before op assignment |
+| `TOPICLOCK` | Lock topic — only chanserv op can change |
+| `SUCCESSOR` | Set fallback owner if current owner drops |
+
+---
+
+## IRCv3 Capabilities
+
+| Capability | Announcement | Description |
+|-----------|-------------|-------------|
+| `sasl` | `SASL=PLAIN` | SASL authentication (PLAIN mechanism) |
+| `account-tag` | `account-tag` | Attach account name to message tags |
+| `account-notify` | `account-notify` | Notify on account login/logout |
+| `away-notify` | `away-notify` | Notify on away status changes |
+| `cap-notify` | `cap-notify` | Notify on server cap changes |
+| `chghost` | `chghost` | Notify on hostname changes |
+| `client-tags` | `client-tags` | Pass `+prefix` client-only tags |
+| `extended-join` | `extended-join` | Account + real name in JOIN |
+| `invite-extended` | `invite-extended` | Account info in INVITE |
+| `invite-notify` | `invite-notify` | Notify channel on invites |
+| `multi-prefix` | `multi-prefix` | All status prefixes in NAMES |
+| `message-tags` | `message-tags` | Full message tag support |
+| `server-time` | `server-time` | `time=` tag on all messages |
+| `msgid` | `msgid` | Unique `msgid=` tag on all messages |
+| `monitor` | `monitor` | User presence tracking |
+| `setname` | `setname` | Change real name during session |
+| `uhnames` | `uhnames` | `nick!ident@host` in NAMES replies |
+| `extended-uhlist` | `extended-uhlist` | Extended user modes in WHO |
+| `sts` | `sts=...` | TLS upgrade policy (non-requestable) |
+
+---
+
+## Transport Types
+
+| Transport | Backend | Default Port | Notes |
+|-----------|---------|-------------|-------|
+| `tcp` | ThousandIsland | 6667 | Plain IRC |
+| `tls` | ThousandIsland | 6697 | IRC over TLS |
+| `ws` | Bandit | 8080 | IRC over WebSocket |
+| `wss` | Bandit | 8443 | IRC over WebSocket + TLS |
+
+---
+
+## Security Features
+
+| Feature | Description |
+|---------|-------------|
+| TLS | Configurable per listener |
+| SASL PLAIN | Requires TLS by default (configurable) |
+| Argon2id passwords | All NickServ passwords hashed with Argon2id |
+| HMAC hostname cloaking | HMAC-SHA with configurable secret keys |
+| Connection rate limiting | Token bucket per IP with violation tracking |
+| Message rate limiting | Token bucket per user with disconnect on threshold |
+| Per-command throttle | Configurable stricter limits per IRC command |
+| IP exemptions | Whitelist IPs/CIDRs from rate limits |
+| WebIRC | Trusted gateway IP passthrough |
+
+---
+
+## Not Implemented
+
+The following features are **not** implemented in the current codebase:
+
+| Feature | Notes |
+|---------|-------|
+| SASL EXTERNAL | TLS client certificate auth |
+| SASL SCRAM-SHA-256 | Modern SCRAM mechanism |
+| Server-to-server linking | Single-server only |
+| `batch` capability | No batched message delivery |
+| `echo-message` capability | No message echo to sender |
+| `labeled-response` capability | No response correlation |
+| `standard-replies` capability | No structured error responses |
+| `&` local channels | Only `#` channels |
+| Shunning / Z-lines | Use firewall for IP blocks |
+| Server-side message history / playback | No chathistory support |

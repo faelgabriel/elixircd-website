@@ -1,0 +1,92 @@
+---
+title: Capabilities
+description: Configuring IRCv3 capabilities in ElixIRCd.
+sidebar:
+  order: 6
+---
+
+## Capabilities Block
+
+Each capability can be individually enabled or disabled:
+
+```elixir
+capabilities: [
+  extended_names: true,
+  extended_uhlist: true,
+  message_tags: true,
+  account_tag: true,
+  account_notify: true,
+  away_notify: true,
+  cap_notify: true,
+  chghost: true,
+  client_tags: true,
+  extended_join: true,
+  invite_extended: true,
+  invite_notify: true,
+  multi_prefix: true,
+  sasl: true,
+  setname: true,
+  server_time: true,
+  msgid: true,
+  sts: true,
+  monitor: true
+]
+```
+
+## Capability Reference
+
+| Config Key | IRCv3 Name | Default | Description |
+|-----------|-----------|---------|-------------|
+| `extended_names` | `UHNAMES` | `true` | Full `nick!ident@host` in NAMES replies |
+| `extended_uhlist` | `EXTENDED-UHLIST` | `true` | Extended user modes in WHO replies |
+| `message_tags` | `MESSAGE-TAGS` | `true` | IRCv3 message tags support |
+| `account_tag` | `ACCOUNT-TAG` | `true` | Account name in message tags |
+| `account_notify` | `ACCOUNT-NOTIFY` | `true` | Account identify/logout notifications |
+| `away_notify` | `AWAY-NOTIFY` | `true` | Real-time away status changes |
+| `cap_notify` | `CAP-NOTIFY` | `true` | Notify when server capabilities change |
+| `chghost` | `CHGHOST` | `true` | Real-time hostname change notifications |
+| `client_tags` | `CLIENT-TAGS` | `true` | Allow client-only message tags |
+| `extended_join` | `EXTENDED-JOIN` | `true` | JOIN with account name and real name |
+| `invite_extended` | `INVITE-EXTENDED` | `true` | INVITE with account information |
+| `invite_notify` | `INVITE-NOTIFY` | `true` | Notify channel on user invite |
+| `multi_prefix` | `MULTI-PREFIX` | `true` | Multiple status prefixes in NAMES |
+| `sasl` | `SASL` | `true` | SASL authentication |
+| `setname` | `SETNAME` | `true` | Change real name during session |
+| `server_time` | `SERVER-TIME` | `true` | Timestamp on messages |
+| `msgid` | `MSGID` | `true` | Unique message identifiers |
+| `sts` | `STS` | `true` | Strict Transport Security |
+| `monitor` | `MONITOR` | `true` | User online/offline tracking |
+
+## Non-Requestable Capabilities
+
+Some capabilities are **informational only** — they appear in `CAP LS` but clients cannot request them via `CAP REQ`:
+
+| Capability | Reason |
+|-----------|--------|
+| `STS` | Policy announcement only; no behavior change for the client connection |
+
+## Capability Details
+
+### SASL
+
+When enabled, the SASL capability is announced as `SASL=PLAIN` (since PLAIN is the only supported mechanism). See [SASL Configuration](/configuration/sasl/) for SASL-specific settings.
+
+### STS (Strict Transport Security)
+
+When enabled, the STS capability is announced differently depending on the connection type:
+- **Plaintext connections**: `sts=port=6697` (tells client to upgrade)
+- **TLS connections**: `sts=duration=2592000` (tells client to cache the policy)
+
+See [STS Configuration](/configuration/sasl/#sts) and [SSL/TLS Setup](/getting-started/tls-setup/).
+
+### SERVER-TIME
+
+When enabled, every message includes a `time=` tag with the server's current timestamp in ISO 8601 format. Clients with this capability will display messages with accurate timestamps.
+
+### MSGID
+
+When enabled, every message includes a `msgid=` tag with a unique identifier. This allows clients to track individual messages.
+
+### ACCOUNT-TAG
+
+When enabled, messages from identified users include an `account=` tag with their account name. Useful for clients to display account information alongside messages.

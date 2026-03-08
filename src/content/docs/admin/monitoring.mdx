@@ -1,0 +1,239 @@
+---
+title: Monitoring
+description: How to monitor an ElixIRCd server for health, performance, and abuse.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## IRC-Level Monitoring
+
+### Server Statistics (STATS)
+
+The `STATS` command provides real-time server information. IRC operators have access to all STATS letters.
+
+```
+/stats u    # Uptime + connection count
+/stats c    # Configured connections / listeners
+/stats o    # Operator entries
+/stats l    # Link information
+/stats m    # Command usage counts
+```
+
+### LUSERS
+
+Shows current user/channel counts:
+
+```
+/lusers
+```
+
+```
+:server 251 yournick :There are 42 users and 0 invisible on 1 servers
+:server 252 yournick 2 :IRC Operators online
+:server 253 yournick 0 :unknown connections
+:server 254 yournick 18 :channels formed
+:server 255 yournick :I have 42 clients and 0 servers
+```
+
+### Server Notices
+
+Operators with `+s` mode receive server notices about:
+- New connections
+- Disconnections
+- Rate limit violations
+- KILL actions
+- OPER logins
+
+Enable server notices:
+
+```
+/mode yournick +s
+```
+
+## Rate Limiter Metrics
+
+When the rate limiter activates, it logs violations. Watch for:
+
+- **Connection flood**: Rapid connections from a single IP
+- **Message flood**: Users sending at high rates
+- **Violation threshold reached**: User disconnected by rate limiter
+
+These appear in server logs at `:warning` level.
+
+## WHOWAS Tracking
+
+The server maintains a list of recent nick changes. To check who held a nick:
+
+```
+/whowas OldNick
+```
+
+Useful for tracking abusive users who change nicks.
+
+## WATCH / MONITOR
+
+Operators and regular users can track user presence. MONITOR is the IRCv3 replacement for WATCH:
+
+```
+MONITOR + Nick1,Nick2    # Watch these nicks
+MONITOR L                # List watched nicks
+MONITOR S                # Status of all watched nicks
+MONITOR C                # Clear watch list
+MONITOR - Nick1          # Stop watching Nick1
+```
+
+Responses:
+- `731 RPL_MONOFFLINE` — nick is offline
+- `730 RPL_MONONLINE` — nick is online
+
+## Logging Infrastructure
+
+### Elixir Logger
+
+ElixIRCd uses Elixir's built-in Logger. Logs are structured at severity levels:
+
+| Level | Content |
+|-------|---------|
+| `:debug` | Detailed protocol traces |
+| `:info` | Connections, disconnections, service events |
+| `:warning` | Rate limit violations, failed auth attempts |
+| `:error` | Unexpected errors, listener failures |
+
+Configure in `config/runtime.exs`:
+
+```elixir
+config :logger, level: :info
+
+# For structured JSON logging (requires :logger_json):
+config :logger,
+  backends: [:console],
+  format: "$time $metadata[$level] $message\n"
+```
+
+### Forwarding to External Systems
+
+Elixir Logger supports backends for forwarding logs:
+
+```elixir
+# Forward to syslog
+config :logger,
+  backends: [LoggerSyslog.Backend]
+
+# Forward to ELK / Loki via file
+config :logger,
+  backends: [{LoggerFileBackend, :info_log}],
+  info_log: [
+    path: "/var/log/elixircd/info.log",
+    level: :info
+  ]
+```
+
+## Monitoring with systemd
+
+If running under systemd, use `journalctl`:
+
+```bash
+# Follow logs in real-time
+journalctl -u elixircd -f
+
+# Show last 100 lines
+journalctl -u elixircd -n 100
+
+# Filter by level (requires structured logging)
+journalctl -u elixircd -p warning
+```
+
+## BEAM / OTP Observability
+
+ElixIRCd runs on the BEAM virtual machine, which has excellent built-in observability tools.
+
+### Observer (GUI)
+
+From a connected IEx session:
+
+```elixir
+:observer.start()
+```
+
+This opens a graphical dashboard showing:
+- Process tree
+- Memory usage by process
+- Message queue depths
+- ETS/Mnesia table sizes
+- Network connections
+
+### From IEx Console
+
+```elixir
+# Total memory usage
+:erlang.memory()
+
+# Process count
+length(Process.list())
+
+# Scheduler usage
+:scheduler.utilization(1000)  # 1 second sample
+
+# Top memory consumers
+Process.list()
+|> Enum.map(fn pid ->
+  info = Process.info(pid, [:memory, :registered_name])
+  {pid, info}
+end)
+|> Enum.sort_by(fn {_, info} -> -info[:memory] end)
+|> Enum.take(10)
+```
+
+### Mnesia Table Stats
+
+```elixir
+# Number of registered users
+:mnesia.table_info(:registered_users, :size)
+
+# Number of registered channels
+:mnesia.table_info(:registered_channels, :size)
+```
+
+## Connection Tracking
+
+To count currently connected users:
+
+```
+/lusers
+```
+
+Or from IEx:
+
+```elixir
+# Count connected users (approximate — check actual table name)
+Memento.transaction!(fn ->
+  Memento.Query.all(ElixIRCd.Tables.User)
+end) |> length()
+```
+
+## Health Check Endpoint
+
+ElixIRCd does not ship a built-in HTTP health check endpoint. For orchestration systems (Kubernetes, etc.), use a TCP health check against the IRC port:
+
+```yaml
+# Kubernetes liveness probe
+livenessProbe:
+  tcpSocket:
+    port: 6667
+  initialDelaySeconds: 10
+  periodSeconds: 30
+```
+
+Or implement a simple IRC ping check:
+
+```bash
+#!/bin/bash
+echo -e "NICK healthcheck\r\nUSER health 0 * :health\r\nQUIT\r\n" | \
+  timeout 5 nc irc.example.com 6667 | grep -q "001" && echo "OK" || echo "FAIL"
+```
+
+<Aside type="note">
+  For production deployments, integrate with your existing observability stack (Prometheus + Grafana, Datadog, etc.) using Elixir's `:telemetry` library or log forwarding.
+</Aside>

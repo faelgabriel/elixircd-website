@@ -1,0 +1,131 @@
+---
+title: SSL/TLS Setup
+description: Configuring SSL/TLS certificates for secure IRC connections.
+sidebar:
+  order: 5
+---
+
+import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+ElixIRCd supports SSL/TLS for both IRC (port 6697) and WebSocket (port 8443) listeners.
+
+## Development (Self-Signed Certificates)
+
+By default, ElixIRCd **automatically generates self-signed certificates** for any listener configured with these specific file paths:
+
+```elixir
+keyfile: "data/cert/selfsigned_key.pem"
+certfile: "data/cert/selfsigned.pem"
+```
+
+This is convenient for development and testing but will trigger browser/client certificate warnings. **Do not use self-signed certificates in production.**
+
+## Production (Let's Encrypt)
+
+<Steps>
+
+1. **Obtain certificates from Let's Encrypt**
+
+   Using Certbot:
+   ```bash
+   certbot certonly --standalone -d irc.yourdomain.com
+   ```
+
+   Certificates are placed in `/etc/letsencrypt/live/irc.yourdomain.com/`:
+   - `fullchain.pem` — certificate chain
+   - `privkey.pem` — private key
+
+2. **Copy certificates to your cert directory**
+
+   ```bash
+   mkdir -p cert
+   cp /etc/letsencrypt/live/irc.yourdomain.com/fullchain.pem cert/
+   cp /etc/letsencrypt/live/irc.yourdomain.com/privkey.pem cert/
+   ```
+
+3. **Update your configuration**
+
+   ```elixir title="elixircd.exs"
+   listeners: [
+     {:tcp, [port: 6667]},
+     {:tls, [
+       port: 6697,
+       transport_options: [
+         keyfile: Path.expand("data/cert/privkey.pem"),
+         certfile: Path.expand("data/cert/fullchain.pem")
+       ]
+     ]},
+     {:http, [port: 8080]},
+     {:https, [
+       port: 8443,
+       keyfile: Path.expand("data/cert/privkey.pem"),
+       certfile: Path.expand("data/cert/fullchain.pem")
+     ]}
+   ]
+   ```
+
+4. **Run Docker with the cert directory mounted**
+
+   ```bash
+   docker run \
+     -p 6667:6667 -p 6697:6697 -p 8080:8080 -p 8443:8443 \
+     -v ./elixircd.exs:/app/config/elixircd.exs \
+     -v ./cert/:/app/data/cert/ \
+     faelgabriel/elixircd
+   ```
+
+</Steps>
+
+## Strict Transport Security (STS)
+
+ElixIRCd supports the IRCv3 **STS (Strict Transport Security)** capability. When enabled, clients that support STS will:
+
+1. On **plaintext connections**: receive the TLS port to upgrade to
+2. On **TLS connections**: receive a duration policy, telling them to cache the STS policy and always use TLS for future connections
+
+Configuration:
+
+```elixir
+sts: [
+  port: 6697,           # TLS port to advertise for upgrade
+  duration: 2_592_000,  # 30 days in seconds
+  preload: false        # Allow preloading (advanced)
+]
+```
+
+STS is announced via `CAP LS` as `sts=port=6697` on plaintext connections and `sts=duration=2592000` on TLS connections.
+
+<Aside type="note">
+  STS is **informational only** — it cannot be requested by clients via `CAP REQ`. It is automatically included in `CAP LS` responses when enabled.
+</Aside>
+
+## Verifying TLS
+
+Once your server is running with TLS, verify it works:
+
+```bash
+# Using openssl
+openssl s_client -connect irc.yourdomain.com:6697
+
+# Using IRC client
+# Connect with SSL enabled on port 6697
+```
+
+Users connecting via TLS will automatically receive the `+Z` (Secure Connection) user mode.
+
+## Certificate Renewal
+
+For Let's Encrypt certificates (90-day validity), set up automatic renewal and server reload:
+
+```bash
+# Crontab entry to renew and reload
+0 0 1 * * certbot renew --post-hook "docker exec <container> ./bin/elixircd eval 'ElixIRCd.reload()'"
+```
+
+Or use `REHASH` if you're an IRC operator:
+
+```irc
+/rehash
+```
+
+The REHASH command reloads the server configuration, which includes picking up new certificate files.

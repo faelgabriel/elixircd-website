@@ -1,0 +1,286 @@
+---
+title: Channel Modes
+description: Complete reference for channel modes in ElixIRCd.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Channel modes control the behavior and restrictions of a channel. Most channel modes require **channel operator** (`+o`) status to set or remove. The `+O` mode additionally requires IRC operator status.
+
+**Syntax:** `MODE <#channel> +<modes> [arguments]`
+
+---
+
+## +C — No CTCP
+
+**Arguments:** None
+**Purpose:** Block CTCP messages sent to the channel.
+
+When set, CTCP messages (those enclosed in `\x01...\x01`) sent to the channel are blocked. The sender receives a `ERR_CANNOTSENDTOCHAN` or similar error.
+
+This prevents CTCP-based floods and DCC exploit attempts targeting channel users.
+
+```irc
+MODE #channel +C
+```
+
+---
+
+## +c — No Colors
+
+**Arguments:** None
+**Purpose:** Block messages containing IRC color codes.
+
+When set, any PRIVMSG or NOTICE containing IRC color codes (`\x03`), bold (`\x02`), underline (`\x1F`), reverse (`\x16`), or reset (`\x0F`) characters is blocked. The message is filtered before delivery.
+
+```irc
+MODE #channel +c
+```
+
+---
+
+## +d — Delay Message
+
+**Arguments:** `<seconds>` (positive integer)
+**Purpose:** Require users to wait N seconds after joining before they can send messages.
+
+This prevents "join flood" abuse patterns where users join and immediately spam.
+
+```irc
+MODE #channel +d 30    # 30-second delay for new joiners
+MODE #channel -d       # Remove delay
+```
+
+The delay value is replaced (not added) if set again with a new value.
+
+---
+
+## +i — Invite Only
+
+**Arguments:** None
+**Purpose:** Restrict channel to invited users only.
+
+When set, users can only join if:
+1. They have been explicitly invited with `INVITE`, OR
+2. Their hostmask matches an invite exception (`+I` mask)
+
+```irc
+MODE #channel +i
+INVITE Alice #channel    # Now invite Alice specifically
+```
+
+---
+
+## +j — Join Throttle
+
+**Arguments:** `<joins>:<seconds>` (both must be positive integers)
+**Purpose:** Limit the rate at which users can join the channel.
+
+The format specifies the maximum number of joins allowed in the specified time window. If the threshold is exceeded, further join attempts receive an error.
+
+```irc
+MODE #channel +j 5:60    # Max 5 joins per 60 seconds
+MODE #channel +j 10:30   # Max 10 joins per 30 seconds
+MODE #channel -j         # Remove throttle
+```
+
+<Aside type="note">
+  IRC operators (`+o` globally) bypass the join throttle restriction. The format must be `N:T` with both N and T being positive integers; invalid formats are rejected with `ERR_UNKNOWNMODE`.
+</Aside>
+
+---
+
+## +k — Key (Channel Password)
+
+**Arguments:** `<password>`
+**Purpose:** Require a password to join the channel.
+
+```irc
+MODE #channel +k secret    # Set password "secret"
+MODE #channel -k           # Remove the password
+```
+
+Users must provide the key when joining:
+```irc
+JOIN #channel secret
+```
+
+<Aside type="note">
+  The key is replaced (not stacked) if `+k` is set again with a different value.
+</Aside>
+
+---
+
+## +l — Limit
+
+**Arguments:** `<number>` (positive integer)
+**Purpose:** Limit the number of users who can join the channel.
+
+Once the limit is reached, further join attempts receive `ERR_CHANNELISFULL`.
+
+```irc
+MODE #channel +l 100    # Allow max 100 users
+MODE #channel -l        # Remove the limit
+```
+
+The limit value is replaced if set again.
+
+---
+
+## +m — Moderated
+
+**Arguments:** None
+**Purpose:** Only users with voice (`+v`) or operator (`+o`) status can send messages.
+
+Regular users cannot send PRIVMSG or NOTICE to a moderated channel.
+
+```irc
+MODE #channel +m
+```
+
+---
+
+## +M — Registered Only Speak
+
+**Arguments:** None
+**Purpose:** Only registered (identified) users may send messages to the channel.
+
+Unregistered users can join but cannot speak. They must identify with NickServ first.
+
+```irc
+MODE #channel +M
+```
+
+---
+
+## +n — No External Messages
+
+**Arguments:** None
+**Purpose:** Only users who are in the channel can send messages to it.
+
+Without `+n`, anyone can send messages to the channel even without being joined (PRIVMSG from outside). This mode is commonly set on most channels.
+
+```irc
+MODE #channel +n
+```
+
+---
+
+## +O — Oper Only
+
+**Arguments:** None
+**Purpose:** Only IRC operators can join this channel.
+**Requires:** IRC operator status (`+o` globally) to set
+
+Non-operators attempting to join receive `ERR_IRCOPERONLYCHAN`.
+
+```irc
+MODE #channel +O    # Must be an IRC operator to set
+```
+
+---
+
+## +p — Private
+
+**Arguments:** None
+**Purpose:** Hide the channel from the `LIST` command output.
+
+The channel is not shown in `/list` results. However, unlike `+s`, the channel name **is** shown in WHOIS for members (unless they also have `+i`).
+
+```irc
+MODE #channel +p
+```
+
+---
+
+## +r — Registered Channel
+
+**Arguments:** None
+**Purpose:** Indicates the channel is registered with ChanServ.
+
+This mode is **set automatically by the server** when a channel is registered via ChanServ. It cannot be manually set or removed by users. It is informational — it tells others the channel has a registered owner.
+
+---
+
+## +R — Registered Only Join
+
+**Arguments:** None
+**Purpose:** Only registered (identified) users may join the channel.
+
+Unregistered users attempting to join receive `ERR_NEEDREGGEDNICK`.
+
+```irc
+MODE #channel +R
+```
+
+---
+
+## +s — Secret
+
+**Arguments:** None
+**Purpose:** Hide the channel from both `LIST` and `WHOIS`.
+
+The channel is not shown in `/list` results, and it is not shown in WHOIS for any member. It is more hidden than `+p`.
+
+```irc
+MODE #channel +s
+```
+
+---
+
+## +t — Topic Lock
+
+**Arguments:** None
+**Purpose:** Only channel operators can change the topic.
+
+When set, regular users (without `+o`) cannot change the topic.
+
+```irc
+MODE #channel +t
+```
+
+---
+
+## +T — No NOTICEs
+
+**Arguments:** None
+**Purpose:** Block NOTICE messages sent to the channel.
+
+NOTICE messages from users outside or inside the channel are blocked. PRIVMSGs are not affected.
+
+```irc
+MODE #channel +T
+```
+
+---
+
+## +u — Auditorium
+
+**Arguments:** None
+**Purpose:** Hide join/part/quit messages from non-voiced users.
+
+When set:
+- Users with voice (`+v`) or operator (`+o`) see all join/part/quit messages normally
+- Regular users (no special status) do not see join/part/quit messages from other regular users
+- Useful for large channels, read-only announcement channels, or high-traffic events
+
+```irc
+MODE #channel +u
+```
+
+---
+
+## +z — Secure Only
+
+**Arguments:** None
+**Purpose:** Only users connected via SSL/TLS (`+Z` mode) may join.
+
+Non-TLS users attempting to join receive `ERR_SECUREONLYCHAN`.
+
+```irc
+MODE #channel +z
+```
+
+This works in conjunction with the `+Z` user mode — the server checks that the user's transport is TLS (`:tls` or `:wss`).

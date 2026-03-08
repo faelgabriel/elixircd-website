@@ -1,0 +1,161 @@
+---
+title: Server Settings
+description: Core server configuration options for ElixIRCd.
+sidebar:
+  order: 2
+---
+
+## Server Block
+
+```elixir
+config :elixircd,
+  server: [
+    name: "My IRC Network",
+    hostname: "irc.example.com",
+    password: nil,
+    motd: File.read("config/motd.txt")
+  ]
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | string | `"Server Example"` | IRC network name shown in welcome messages |
+| `hostname` | string | `"irc.test"` | Server hostname used as origin in IRC messages |
+| `password` | string/nil | `nil` | Server connection password (nil = no password required) |
+| `motd` | string/tuple | `File.read(...)` | Message of the Day content |
+
+### name
+
+The network name shown in the welcome message:
+```
+:server 001 yournick :Welcome to the <name> Internet Relay Chat Network yournick
+```
+
+### hostname
+
+The server's visible hostname. This appears as the origin of server-sent messages and in YOURHOST:
+```
+:server 002 yournick :Your host is <name>, running version ElixIRCd-X.Y.Z.
+```
+
+### password
+
+If set, clients must send `PASS <password>` before registration. The connection is rejected with `ERR_PASSWDMISMATCH` if the password doesn't match.
+
+```elixir
+password: "mysecretpass"    # Requires PASS command
+password: nil               # No password required (default)
+```
+
+### motd
+
+The Message of the Day content. Typically loaded from a file:
+
+```elixir
+motd: File.read("config/motd.txt")
+```
+
+`File.read/1` returns `{:ok, content}` or `{:error, reason}`. If the file doesn't exist, MOTD will not be available and clients receive `ERR_NOMOTD`.
+
+## Settings Block
+
+```elixir
+settings: [
+  case_mapping: :rfc1459,
+  utf8_only: true
+]
+```
+
+| Option | Type | Default | Values |
+|--------|------|---------|--------|
+| `case_mapping` | atom | `:rfc1459` | `:rfc1459`, `:strict_rfc1459`, `:ascii` |
+| `utf8_only` | boolean | `true` | `true` or `false` |
+
+### case_mapping
+
+Controls how nicknames and channel names are compared for equality.
+
+| Value | Behavior |
+|-------|---------|
+| `:rfc1459` | `{}|` are lowercase equivalents of `[]\`; standard IRC |
+| `:strict_rfc1459` | Only A-Z/a-z equivalences; `{}|` are **not** equivalent to `[]\` |
+| `:ascii` | Only A-Z/a-z are case-equivalent; no special character rules |
+
+**Warning:** Changing this after the server has users/channels registered may cause inconsistencies. Set before first use.
+
+### utf8_only
+
+When `true`, the server enforces UTF-8 only traffic. The `UTF8ONLY` capability token is advertised in ISUPPORT. When `false`, any encoding is accepted.
+
+## User Block
+
+```elixir
+user: [
+  inactivity_timeout_ms: 180_000,
+  max_nick_length: 30,
+  max_ident_length: 10,
+  max_realname_length: 50,
+  max_away_message_length: 200
+]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `inactivity_timeout_ms` | `180_000` | Idle timeout before disconnection (ms) |
+| `max_nick_length` | `30` | Maximum nickname length |
+| `max_ident_length` | `10` | Maximum ident/username length |
+| `max_realname_length` | `50` | Maximum real name (GECOS) length |
+| `max_away_message_length` | `200` | Maximum away message length |
+
+## Channel Block
+
+```elixir
+channel: [
+  channel_prefixes: ["#", "&"],
+  max_channel_name_length: 64,
+  channel_join_limits: %{"#" => 20, "&" => 5},
+  max_list_entries: %{"b" => 100},
+  max_kick_message_length: 255,
+  max_modes_per_command: 20,
+  max_topic_length: 300
+]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `channel_prefixes` | `["#", "&"]` | Valid channel prefix characters |
+| `max_channel_name_length` | `64` | Max channel name length (excl. prefix) |
+| `channel_join_limits` | `%{"#" => 20, "&" => 5}` | Max channels per prefix per user |
+| `max_list_entries` | `%{"b" => 100}` | Max list mode entries per mode |
+| `max_kick_message_length` | `255` | Max kick message length |
+| `max_modes_per_command` | `20` | Max mode changes per MODE command |
+| `max_topic_length` | `300` | Max channel topic length |
+
+## Admin Info Block
+
+```elixir
+admin_info: [
+  server: "My IRC Network",
+  location: "Server Location",
+  organization: "My Organization",
+  email: "admin@example.com"
+]
+```
+
+Returned by the `ADMIN` command.
+
+## Ident Service Block
+
+```elixir
+ident_service: [
+  enabled: true,
+  timeout: 2_000
+]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `true` | Enable RFC 1413 ident lookups |
+| `timeout` | `2_000` | Ident response timeout (ms, max 5000) |
+
+When enabled, the server queries the client's ident daemon (port 113) during connection. The response (if any) overrides the USER-provided ident.

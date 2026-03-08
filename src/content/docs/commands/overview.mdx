@@ -1,0 +1,145 @@
+---
+title: Commands Overview
+description: Complete index of all IRC commands supported by ElixIRCd.
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+ElixIRCd implements all core IRC protocol commands plus IRCv3 extensions. Commands are organized into functional groups.
+
+## Connection Commands
+
+| Command | Description |
+|---------|-------------|
+| [`PASS`](/commands/connection/#pass) | Set a connection password |
+| [`NICK`](/commands/connection/#nick) | Set or change nickname |
+| [`USER`](/commands/connection/#user) | Set username and real name |
+| [`CAP`](/commands/ircv3/#cap) | IRCv3 capability negotiation |
+| [`AUTHENTICATE`](/commands/ircv3/#authenticate) | SASL authentication |
+| [`PING`](/commands/connection/#ping) | Test connection liveness |
+| [`PONG`](/commands/connection/#pong) | Reply to PING |
+| [`QUIT`](/commands/connection/#quit) | Disconnect from server |
+| [`WEBIRC`](/commands/ircv3/#webirc) | WebIRC gateway identification |
+
+## Channel Commands
+
+| Command | Description |
+|---------|-------------|
+| [`JOIN`](/commands/channel/#join) | Join a channel (or create it) |
+| [`PART`](/commands/channel/#part) | Leave a channel |
+| [`MODE`](/commands/channel/#mode) | Set/unset user or channel modes |
+| [`TOPIC`](/commands/channel/#topic) | Get or set channel topic |
+| [`NAMES`](/commands/channel/#names) | List visible users in channel |
+| [`LIST`](/commands/channel/#list) | List channels and topics |
+| [`INVITE`](/commands/channel/#invite) | Invite a user to a channel |
+| [`KICK`](/commands/channel/#kick) | Eject a user from a channel |
+
+## Messaging Commands
+
+| Command | Description |
+|---------|-------------|
+| [`PRIVMSG`](/commands/messaging/#privmsg) | Send a private message or channel message |
+| [`NOTICE`](/commands/messaging/#notice) | Send a notice (no auto-reply) |
+| [`TAGMSG`](/commands/ircv3/#tagmsg) | Send a message with tags but no text |
+| [`AWAY`](/commands/messaging/#away) | Set or clear away status |
+
+## User Information Commands
+
+| Command | Description |
+|---------|-------------|
+| [`WHOIS`](/commands/user-info/#whois) | Get info about a user |
+| [`WHO`](/commands/user-info/#who) | Search users |
+| [`WHOWAS`](/commands/user-info/#whowas) | Info about recently disconnected users |
+| [`USERHOST`](/commands/user-info/#userhost) | Get hostmask info for nicknames |
+| [`USERS`](/commands/user-info/#users) | List users on the server |
+| [`ISON`](/commands/user-info/#ison) | Check if users are online |
+| [`LUSERS`](/commands/user-info/#lusers) | Server user count statistics |
+| [`MONITOR`](/commands/ircv3/#monitor) | Track when users go online/offline |
+
+## User Management Commands
+
+| Command | Description |
+|---------|-------------|
+| [`ACCEPT`](/commands/user-info/#accept) | Manage Caller ID (+g) accept list |
+| [`SILENCE`](/commands/user-info/#silence) | Manage ignore/silence list |
+| [`SETNAME`](/commands/ircv3/#setname) | Change your real name |
+| [`CHGHOST`](/commands/ircv3/#chghost) | Change a user's hostname (operators) |
+
+## Server Information Commands
+
+| Command | Description |
+|---------|-------------|
+| [`MOTD`](/commands/server/#motd) | Get the message of the day |
+| [`VERSION`](/commands/server/#version) | Get server version |
+| [`STATS`](/commands/server/#stats) | Get server statistics |
+| [`INFO`](/commands/server/#info) | Get server info |
+| [`TIME`](/commands/server/#time) | Get server local time |
+| [`TRACE`](/commands/server/#trace) | Trace route to user or server |
+| [`ADMIN`](/commands/server/#admin) | Get server administrator info |
+
+## Operator Commands
+
+| Command | Description |
+|---------|-------------|
+| [`OPER`](/commands/operator/#oper) | Become an IRC operator |
+| [`KILL`](/commands/operator/#kill) | Disconnect a user |
+| [`WALLOPS`](/commands/operator/#wallops) | Broadcast to +w users |
+| [`OPERWALL`](/commands/operator/#operwall) | Message to all operators |
+| [`GLOBOPS`](/commands/operator/#globops) | Global operator message |
+| [`REHASH`](/commands/operator/#rehash) | Reload server configuration |
+| [`RESTART`](/commands/operator/#restart) | Restart the server |
+| [`DIE`](/commands/operator/#die) | Shut down the server |
+| [`ACCOUNT`](/commands/ircv3/#account) | Account change notification |
+
+## IRCv3 Commands
+
+| Command | Description | Status |
+|---------|-------------|--------|
+| `CAP` | Capability negotiation | ✅ |
+| `AUTHENTICATE` | SASL authentication | ✅ |
+| `TAGMSG` | Tag-only messages | ✅ |
+| `WEBIRC` | WebIRC gateway | ✅ |
+| `SETNAME` | Change real name | ✅ |
+| `CHGHOST` | Change hostname | ✅ |
+| `MONITOR` | User tracking | ✅ |
+| `ACCOUNT` | Account notification | ✅ |
+
+<Aside type="note">
+  The commands `WHO` with extended WHOX format, `BATCH`, echo-message, and labeled-response are **not implemented** in the current version.
+</Aside>
+
+## Command Error Codes
+
+When a command fails or has invalid parameters, the server responds with numeric error codes following the IRC protocol standard. Common errors:
+
+| Numeric | Name | Meaning |
+|---------|------|---------|
+| `401` | ERR_NOSUCHNICK | No such nick or channel |
+| `403` | ERR_NOSUCHCHANNEL | No such channel |
+| `404` | ERR_CANNOTSENDTOCHAN | Cannot send to channel |
+| `405` | ERR_TOOMANYCHANNELS | Too many channels joined |
+| `411` | ERR_NORECIPIENT | No recipient given |
+| `412` | ERR_NOTEXTTOSEND | No text to send |
+| `421` | ERR_UNKNOWNCOMMAND | Unknown command |
+| `432` | ERR_ERRONEUSNICKNAME | Erroneous nickname |
+| `433` | ERR_NICKNAMEINUSE | Nickname already in use |
+| `441` | ERR_USERNOTINCHANNEL | User not in channel |
+| `442` | ERR_NOTONCHANNEL | Not on channel |
+| `461` | ERR_NEEDMOREPARAMS | Not enough parameters |
+| `462` | ERR_ALREADYREGISTERED | Already registered |
+| `464` | ERR_PASSWDMISMATCH | Wrong server password |
+| `471` | ERR_CHANNELISFULL | Channel is full (+l) |
+| `473` | ERR_INVITEONLYCHAN | Invite only (+i) |
+| `474` | ERR_BANNEDFROMCHAN | Banned (+b) |
+| `475` | ERR_BADCHANNELKEY | Wrong channel key (+k) |
+| `481` | ERR_NOPRIVILEGES | Permission denied |
+| `482` | ERR_CHANOPRIVSNEEDED | You're not a channel operator |
+| `524` | ERR_SECUREONLYCHAN | SSL required (+z) |
+| `900` | RPL_LOGGEDIN | SASL login success |
+| `903` | RPL_SASLSUCCESS | SASL authentication successful |
+| `904` | ERR_SASLFAIL | SASL authentication failed |
+| `905` | ERR_SASLTOOLONG | SASL message too long |
+| `906` | ERR_SASLABORTED | SASL aborted |
+| `907` | ERR_SASLALREADY | Already authenticated |

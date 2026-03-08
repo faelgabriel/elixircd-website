@@ -1,0 +1,148 @@
+---
+title: Users & Nicknames
+description: How users and nicknames work in ElixIRCd.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## User Identity
+
+Each connected client is identified by a **hostmask** in the format:
+
+```
+nickname!ident@hostname
+```
+
+For example: `Alice!alice@user.isp.com`
+
+| Component | Description |
+|-----------|-------------|
+| `nickname` | The user's current nick (up to 30 chars by default) |
+| `ident` | The username/ident (up to 10 chars, from USER command or ident service) |
+| `hostname` | The user's resolved hostname (or IP if DNS fails) |
+
+## Nicknames
+
+### Rules
+
+- Maximum length: 30 characters (configurable via `max_nick_length`)
+- Must not already be in use (case-insensitive comparison)
+- Case mapping follows the server's configured `case_mapping` (default: `rfc1459`)
+
+### Case Mapping
+
+The server normalizes nicknames internally using case mapping. This determines which characters are considered equivalent:
+
+| Mode | Behavior |
+|------|---------|
+| `rfc1459` | `{}|` are lowercase of `[]\`; standard IRC case rules |
+| `strict_rfc1459` | Only A-Z are uppercase of a-z; `{}\|` are not equivalent |
+| `ascii` | Only A-Z and a-z are treated as case-equivalent |
+
+<Aside type="note">
+  Changing the case mapping after the server has started and users/channels exist may lead to unexpected behavior. Set this before first use.
+</Aside>
+
+### Nickname Changes
+
+Users can change their nick at any time with `/nick NewNick`. The change is broadcast to all channels the user is in.
+
+### Reserved Nicknames
+
+Certain operations temporarily **reserve** a nickname to prevent someone else from using it:
+
+- After `NickServ RECOVER`: the recovered nick is reserved for `recover_reservation_duration` seconds (default: 60s)
+- After `NickServ REGAIN`: the regained nick is reserved for `regain_reservation_duration` seconds (default: 60s)
+
+During the reservation period, no one (not even the original user) can claim the nick.
+
+## Ident Lookup
+
+When a user connects, the server performs an **ident query** (RFC 1413) if `ident_service.enabled = true` (the default):
+
+1. The server connects to the client's port 113 (identd)
+2. If the client responds, the returned username replaces the USER-provided ident
+3. If no response within `ident_service.timeout` (default: 2000ms), the USER-provided ident is used with a `~` prefix
+
+If no ident response is received, the ident typically appears as `~username` in the user's mask.
+
+## Hostname Resolution
+
+Simultaneously with the ident check, the server performs a **reverse DNS lookup**:
+
+- If a hostname is resolved, it is used instead of the raw IP address
+- If no hostname is found, the IP address is used (formatted appropriately for IPv4/IPv6)
+
+## Hostname Cloaking
+
+When hostname cloaking is enabled (`cloaking.enabled = true`), each user gets a **cloaked hostname** generated from their real hostname using an HMAC-based algorithm with the configured `cloak_keys`.
+
+- Users enable cloaking by setting `+x` (Cloaked Hostname) mode
+- The cloaked hostname uses the format: `prefix-HASH.domain-parts`
+- Example: `elixir-A3F2B1C8.isp.com` (with `cloak_prefix: "elixir"`, `cloak_domain_parts: 2`)
+
+If `cloak_on_connect: true`, users automatically get `+x` upon registration.
+
+If `cloak_allow_disable: false`, users cannot remove their `+x` mode.
+
+See [Hostname Cloaking](/security/cloaking/) for full details.
+
+## User Modes
+
+Users can have the following modes set on them:
+
+| Mode | Name | Who sets it | Description |
+|------|------|-------------|-------------|
+| `+B` | Bot | User | Marks the user as a bot |
+| `+g` | Caller ID | User | Blocks PRIVMSGs from non-accepted users |
+| `+H` | Hide Operator | Operator only | Hides IRC op status in WHOIS |
+| `+i` | Invisible | User | Hides from WHO/WHOIS for non-shared channels |
+| `+o` | IRC Operator | Server only | Elevated server privileges |
+| `+r` | Registered | Server only | Identified with NickServ or SASL |
+| `+R` | Registered Only | User | Only registered users can PRIVMSG you |
+| `+s` | Server Notices | Operator only | Receive server notice messages |
+| `+w` | Wallops | User | Receive WALLOPS messages |
+| `+x` | Cloaked | User | Use cloaked hostname |
+| `+Z` | Secure | Server only | Connected via SSL/TLS |
+
+See [User Modes](/modes/user-modes/) for complete details.
+
+## User State
+
+A user's state includes:
+
+- `nick` — current nickname
+- `ident` — username
+- `hostname` — resolved hostname (or IP)
+- `cloaked_hostname` — HMAC-based cloaked hostname
+- `realname` — real name (GECOS), up to 50 chars
+- `modes` — list of active user modes
+- `away_message` — away message, if set
+- `identified_as` — NickServ account the user is identified to
+- `sasl_authenticated` — whether authentication happened via SASL
+- `capabilities` — negotiated IRCv3 capabilities
+- `transport` — `:tcp`, `:tls`, `:ws`, or `:wss`
+- `ip_address` — real IP address
+- `webirc_*` — WebIRC gateway info (if connection came through WebIRC)
+
+## Inactivity Timeout
+
+Users who send no messages for `inactivity_timeout_ms` (default: 180,000ms = 3 minutes) are disconnected with an inactivity timeout.
+
+Regular IRC messages (including PINGs sent by the client) reset the inactivity timer.
+
+## AWAY Status
+
+Users can set an away message with `/away message`. This:
+- Sets the `away_message` field
+- Broadcasts an `AWAY` notification to users who have the `AWAY-NOTIFY` capability enabled
+- Is shown in `/whois` responses
+- Results in an auto-reply when users PRIVMSG them
+
+Clear away status with `/away` (no message).
+
+## WHOWAS History
+
+When a user disconnects, their information is stored in the `HistoricalUsers` table for a limited time, allowing other users to retrieve it with `WHOWAS`.

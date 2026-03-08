@@ -1,0 +1,59 @@
+---
+title: Operator Privileges
+description: What IRC operators can do in ElixIRCd and security considerations.
+sidebar:
+  order: 4
+---
+
+See [Core Concepts — Operators](/core-concepts/operators/) for how to obtain operator status.
+
+## Operator Capabilities Summary
+
+| Action | Command/Mode | Description |
+|--------|-------------|-------------|
+| Disconnect users | `KILL nick :reason` | Remove user from server |
+| Broadcast to admins | `OPERWALL :msg` | Operator-only messages |
+| Global broadcast | `WALLOPS :msg` | Message to `+w` users |
+| Global op message | `GLOBOPS :msg` | Message to all operators |
+| Reload config | `REHASH` | Apply config changes without restart |
+| Restart server | `RESTART` | Restart the process |
+| Shut down server | `DIE` | Terminate the server |
+| View stats | `STATS <letter>` | Server statistics |
+| Change hostnames | `CHGHOST nick newhost` | Modify user's visible hostname |
+| Join oper-only channels | (auto) | Bypass `+O` channel restriction |
+| Set oper modes | `+H`, `+s` | Operator-only user modes |
+| Skip join throttle | (auto) | Not subject to `+j` restriction |
+
+## Security Recommendations
+
+1. **Use strong, unique passwords** for each operator credential
+2. **Always OPER over TLS** — the password is plaintext in the IRC protocol
+3. **Minimize the number of operators** — only trusted admins
+4. **Use +H to stay low-profile** when doing routine moderation
+5. **De-oper when not needed** — `/mode nick -o` when done
+6. **Monitor operator activity** via server notices and logs
+
+## Operator Visibility
+
+By default, IRC operators are visible in WHOIS with:
+```
+:server 313 yournick operNick :is an IRC Operator
+```
+
+Operators can hide their status with `+H`:
+```irc
+MODE yournick +H
+```
+
+When `+H` is set, non-operators doing WHOIS won't see the IRC operator line. Other operators can still see it.
+
+## What Operators Cannot Do (by default)
+
+- Override channel bans to join a banned channel (unless using IRC tricks)
+- Access private messages between users
+- Set modes they don't have permission for (e.g., setting `+r` on themselves manually)
+- Modify registered nick/channel data directly (use services for that)
+
+## Server Notices
+
+Operators with `+s` (Server Notices) mode receive notices about server events, such as client connections.

@@ -1,0 +1,215 @@
+---
+title: Channel Commands
+description: Commands for joining, leaving, and managing IRC channels.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## JOIN
+
+Join one or more channels.
+
+**Syntax:** `JOIN <channel>[,<channel2>,...] [<key>[,<key2>,...]]`
+
+**Behavior:**
+- If the channel doesn't exist, it is created and you become the first operator (`+o`)
+- You can join multiple channels in one command separated by commas
+- If a channel requires a key (`+k`), provide it as the second parameter
+- The server sends: JOIN message → MODE (if you got +o) → TOPIC (or 332/331) → NAMES list (353/366)
+
+**Channel join restrictions (checked in order):**
+1. User per-prefix channel limit exceeded → `ERR_TOOMANYCHANNELS`
+2. You are banned (`+b`) and not excepted (`+e`) → `ERR_BANNEDFROMCHAN`
+3. Channel is invite-only (`+i`) and you have no invite or invex (`+I`) → `ERR_INVITEONLYCHAN`
+4. Channel is registered-only (`+R`) and you're not registered → `ERR_NEEDREGGEDNICK`
+5. Channel is secure-only (`+z`) and you're not on TLS → `ERR_SECUREONLYCHAN`
+6. Wrong key (`+k`) → `ERR_BADCHANNELKEY`
+7. Channel is full (`+l`) → `ERR_CHANNELISFULL`
+8. Join throttle exceeded (`+j`) → `ERR_NEEDREGGEDNICK` (rate exceeded)
+9. Channel is oper-only (`+O`) and you're not an IRC op → `ERR_IRCOPERONLYCHAN`
+
+**Examples:**
+```irc
+JOIN #general
+JOIN #secret secretkey
+JOIN #chan1,#chan2,#chan3
+JOIN #secret,#other key1,
+```
+
+<Aside type="tip">
+  When joining a channel with `EXTENDED-JOIN` capability, the JOIN message includes the account name and real name. Clients supporting this capability will see richer join information.
+</Aside>
+
+---
+
+## PART
+
+Leave one or more channels.
+
+**Syntax:** `PART <channel>[,<channel2>,...] [:<message>]`
+
+**Behavior:**
+- Broadcasts your departure to all channel members
+- The part message is optional
+
+**Examples:**
+```irc
+PART #general
+PART #general :Leaving for now
+PART #chan1,#chan2
+```
+
+---
+
+## MODE
+
+Set or unset modes on a channel or user.
+
+**Syntax (channel):** `MODE <channel> [+/-modes] [mode arguments...]`
+**Syntax (user):** `MODE <nick> [+/-modes]`
+
+**Behavior:**
+- Without arguments: returns current modes of the channel or user
+- With arguments: applies the specified mode changes
+- Multiple modes can be changed in one command (up to `max_modes_per_command`, default: 20)
+
+**Channel mode examples:**
+```irc
+MODE #channel +m          # Set moderated
+MODE #channel +k secret   # Set channel key
+MODE #channel +o Alice    # Give Alice operator
+MODE #channel +v Bob      # Give Bob voice
+MODE #channel +b *!*@spammer.net  # Ban mask
+MODE #channel -k          # Remove channel key
+MODE #channel +im         # Set invite-only and moderated
+MODE #channel +j 5:60     # Join throttle: 5 joins per 60 seconds
+MODE #channel +d 30       # 30-second delay for new users to speak
+```
+
+**User mode examples:**
+```irc
+MODE yournick +i          # Set invisible
+MODE yournick +x          # Enable hostname cloaking
+MODE yournick -i          # Remove invisible
+```
+
+**Listing modes:**
+```irc
+MODE #channel +b          # List bans
+MODE #channel +e          # List ban exceptions
+MODE #channel +I          # List invite exceptions
+```
+
+**Errors:**
+- `482 ERR_CHANOPRIVSNEEDED` — not a channel operator
+- `481 ERR_NOPRIVILEGES` — setting operator-only modes without being an IRC op
+- `472 ERR_UNKNOWNMODE` — unknown mode character
+
+See [Modes](/modes/overview/) for the complete mode reference.
+
+---
+
+## TOPIC
+
+Get or set the topic of a channel.
+
+**Syntax:** `TOPIC <channel> [:<new topic>]`
+
+**Without topic argument:** Returns the current topic (332) or "no topic" (331).
+
+**With topic argument:** Sets a new topic.
+- Restricted to channel operators if `+t` is set
+- Channel operators can always change the topic regardless of `+t`
+
+**Constraints:**
+- Maximum topic length: 300 characters
+
+**Examples:**
+```irc
+TOPIC #general                    # View current topic
+TOPIC #general :Welcome to our channel!
+TOPIC #general :                  # Clear the topic
+```
+
+---
+
+## NAMES
+
+List all visible users in a channel.
+
+**Syntax:** `NAMES [<channel>]`
+
+**Behavior:**
+- Returns a `353 RPL_NAMREPLY` with nicks prefixed by their status symbol (`@` for op, `+` for voice)
+- If `UHNAMES` capability is enabled, nicks are shown as `nick!ident@host`
+- If `MULTI-PREFIX` capability is enabled, users with multiple modes show all prefixes (e.g., `@+nick`)
+- Without a channel argument, lists all visible users on the server
+
+**Example response:**
+```
+:server 353 you = #general :@Alice +Bob Carol Dave
+:server 366 you #general :End of NAMES list.
+```
+
+---
+
+## LIST
+
+List channels and their topics.
+
+**Syntax:** `LIST [<channel>[,<channel2>,...]]`
+
+**Behavior:**
+- Returns a list of channels with user count and topic
+- Channels with `+s` (Secret) or `+p` (Private) modes are **hidden** from LIST
+- With channel argument(s): shows info for those specific channels only
+
+**Example:**
+```irc
+LIST
+LIST #general,#help
+```
+
+---
+
+## INVITE
+
+Invite a user to a channel.
+
+**Syntax:** `INVITE <nick> <channel>`
+
+**Behavior:**
+- Must be a channel operator to invite to `+i` channels
+- The invited user receives a `INVITE` message
+- The invite is tracked and allows the user to join even if the channel is `+i`
+- If `INVITE-NOTIFY` capability is enabled, other channel members are notified of the invite
+- If `INVITE-EXTENDED` capability is enabled, the invite message includes account information
+
+**Examples:**
+```irc
+INVITE Alice #secret
+```
+
+---
+
+## KICK
+
+Eject a user from a channel.
+
+**Syntax:** `KICK <channel> <nick> [:<reason>]`
+
+**Behavior:**
+- Requires channel operator status
+- The kicked user receives a KICK message and is removed from the channel
+- The kicked user can rejoin unless they are also banned
+
+**Constraints:**
+- Maximum kick message length: 255 characters
+
+**Examples:**
+```irc
+KICK #general Bob
+KICK #general Bob :Spamming
+```

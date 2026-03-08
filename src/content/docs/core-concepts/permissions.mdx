@@ -1,0 +1,107 @@
+---
+title: Permissions Model
+description: Understanding the permission hierarchy in ElixIRCd.
+sidebar:
+  order: 6
+---
+
+## Permission Hierarchy
+
+ElixIRCd has three levels of permission, from least to most privileged:
+
+```
+Regular User
+    │
+    ▼
+Channel Operator (+o in channel)
+    │
+    ▼
+IRC Operator (+o globally)
+```
+
+## Regular Users
+
+Regular connected users can:
+- Join channels (subject to channel mode restrictions)
+- Send messages to channels and other users
+- Set some user modes on themselves (`+B`, `+g`, `+i`, `+R`, `+w`, `+x`)
+- Set or remove away messages
+- Use standard IRC commands (NICK, JOIN, PART, PRIVMSG, NOTICE, etc.)
+- Register nicknames with NickServ
+- Register channels with ChanServ
+
+Regular users **cannot**:
+- Set modes restricted to operators (`+H`, `+s`, `+o`)
+- Remove server-managed modes (`+r`, `+Z`)
+- Join `+O` (Oper Only) channels
+- Use operator commands (KILL, REHASH, etc.)
+
+## Channel Operators
+
+Users with `+o` in a specific channel can, within that channel:
+- Kick other users (`/kick`)
+- Set/unset channel modes (all modes except `+O` which requires IRC op)
+- Ban users (`+b`)
+- Change the channel topic (unless `+t` is set — but ops can always change it)
+- Grant/revoke voice (`+v`) and op (`+o`) to other users
+
+Channel operators **cannot**:
+- Set `+O` (requires IRC operator)
+- Access other channels they're not op in
+- Use server-level commands
+
+## IRC Operators
+
+IRC operators (set via `/oper`) have server-wide privileges:
+
+| Capability | Description |
+|-----------|-------------|
+| `+O` channel mode | Only they can set; grants IRC ops-only access to channels |
+| Join `+O` channels | Can join channels with Oper Only mode |
+| Bypass `+j` | Not subject to channel join throttle |
+| `KILL` | Disconnect users from the network |
+| `OPERWALL` | Send messages to all operators |
+| `GLOBOPS` | Send global operator messages |
+| `WALLOPS` | Broadcast to all `+w` users |
+| `REHASH` | Reload server configuration |
+| `RESTART` | Restart the server |
+| `DIE` | Shut down the server |
+| `STATS` | View detailed server statistics |
+| `TRACE` | Trace connection routes |
+| `CHGHOST` | Change a user's hostname |
+| Operator modes | Can set `+H` and `+s` |
+| WHOIS visibility | Can see hidden info in WHOIS |
+
+## Registered User Privileges
+
+Users identified with NickServ get the `+r` mode, which grants:
+- Access to `+R` channels (registered-only join)
+- Ability to speak in `+M` channels (registered-only speak)
+- Protection from `+R` user mode (only registered users can PRIVMSG them)
+- ChanServ founder access for their registered channels
+
+## Mode Permission Summary
+
+| Mode | Set by user | Removed by user | Set by server | Notes |
+|------|:-----------:|:---------------:|:-------------:|-------|
+| `+B` | ✅ | ✅ | ❌ | |
+| `+g` | ✅ | ✅ | ❌ | |
+| `+H` | ✅ (ops only) | ✅ (ops only) | ❌ | Removed when -o |
+| `+i` | ✅ | ✅ | ❌ | |
+| `+o` | ❌ | ✅ | ✅ (via OPER) | Removing also removes +H, +s |
+| `+r` | ❌ | ❌ | ✅ (NickServ/SASL) | |
+| `+R` | ✅ | ✅ | ❌ | |
+| `+s` | ✅ (ops only) | ✅ (ops only) | ❌ | Removed when -o |
+| `+w` | ✅ | ✅ | ❌ | |
+| `+x` | ✅ | ✅* | ❌ | *Unless cloak_allow_disable=false |
+| `+Z` | ❌ | ❌ | ✅ (TLS connection) | |
+
+## Channel Operator Permission Summary
+
+The channel `MODE` command checks:
+
+1. Is the user a channel operator (`+o` in that channel)? → Can set most channel modes
+2. Is the user an IRC operator? → Can set `+O` channel mode
+3. Otherwise → MODE changes are rejected
+
+Exception: IRC operators can set `+O` channel mode even without being a channel operator.

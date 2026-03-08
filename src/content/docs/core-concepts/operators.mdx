@@ -1,0 +1,106 @@
+---
+title: Operators
+description: Understanding IRC operators and their privileges in ElixIRCd.
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## What is an IRC Operator?
+
+An IRC operator (IRC op or IRCop) is a user with elevated server-level privileges. Operators can manage the entire server, not just a single channel.
+
+Operators are **not** the same as channel operators. Channel operators (`+o` in a channel) only have privileges within that channel.
+
+## Becoming an Operator
+
+To become an IRC operator, you need:
+
+1. A configured operator credential in `elixircd.exs` (see [Operators Configuration](/configuration/operators/))
+2. Run the OPER command after connecting
+
+```irc
+/oper admin yourpassword
+```
+
+If successful, you receive the `+o` user mode and a message like:
+```
+You are now an IRC Operator
+```
+
+<Aside type="caution">
+  The OPER command sends your password to the server. Always use it over a TLS/SSL connection for security.
+</Aside>
+
+## Operator Modes
+
+When you become an operator, you receive the `+o` mode. You can also set additional operator-only modes:
+
+| Mode | Description |
+|------|-------------|
+| `+o` | IRC Operator status — server-managed, cannot be self-set |
+| `+H` | Hide Operator — hides your IRC op status in WHOIS from non-operators |
+| `+s` | Server Notices — receive server notice messages (snomask) |
+
+Setting `+H` makes you appear as a regular user in WHOIS responses to non-operators. Operators can still see your op status.
+
+When you remove `+o` (de-oper), all operator-only modes (`+H`, `+s`) are automatically removed as well.
+
+## Operator Privileges
+
+IRC operators can use special commands:
+
+| Command | What it does |
+|---------|-------------|
+| `KILL <nick> <reason>` | Forcefully disconnect a user from the server |
+| `OPERWALL <message>` | Send a message to all operators |
+| `GLOBOPS <message>` | Send a global operator message to all operators |
+| `WALLOPS <message>` | Broadcast a message to all users with `+w` mode |
+| `REHASH` | Reload the server configuration |
+| `RESTART` | Restart the server |
+| `DIE` | Shut down the server |
+| `STATS <letter>` | View server statistics |
+| `TRACE` | Trace routes to users/servers |
+| `CHGHOST <user> <newhost>` | Change a user's hostname |
+
+Additionally, operators:
+- Can join channels with `+O` (Oper Only) mode
+- Bypass `+j` (Join Throttle) restrictions
+- Can set the `+O` channel mode (Oper Only)
+- Can view hidden information in WHOIS that non-operators cannot see
+
+## WALLOPS and OPERWALL
+
+- **WALLOPS** (`/wallops message`) — sends a broadcast to all users with the `+w` (Wallops) user mode. Regular users can enable `+w` to receive these messages.
+- **OPERWALL** (`/operwall message`) — sends a message only to operators. Regular users cannot see it.
+- **GLOBOPS** (`/globops message`) — sends a global message to all operators.
+
+## De-Opering
+
+To relinquish operator status:
+
+```irc
+/mode yournick -o
+```
+
+This removes `+o` and automatically removes any operator-only modes (`+H`, `+s`).
+
+## Operator Configuration
+
+Operator credentials are stored in `elixircd.exs`:
+
+```elixir
+operators: [
+  {"admin", "$argon2id$v=19$m=4096,t=2,p=4$...hash..."}
+]
+```
+
+The password is hashed with **Argon2id**. To generate a hash:
+
+```elixir
+# In iex or via docker exec
+Argon2.hash_pwd_salt("your_password_here")
+```
+
+See [IRC Operators Configuration](/configuration/operators/) for full details.

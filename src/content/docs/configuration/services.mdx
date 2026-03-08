@@ -1,0 +1,152 @@
+---
+title: Services Configuration
+description: Configuring NickServ and ChanServ in ElixIRCd.
+sidebar:
+  order: 8
+---
+
+## Services Block
+
+```elixir
+services: [
+  nickserv: [
+    enabled: true,
+    min_password_length: 6,
+    nick_expire_days: 90,
+    email_required: false,
+    wait_register_time: 120,
+    unverified_expire_days: 1,
+    regain_reservation_duration: 60,
+    recover_reservation_duration: 60,
+    max_access_entries: 10,
+    settings: [
+      hide_email: false
+    ]
+  ],
+  chanserv: [
+    enabled: true,
+    min_password_length: 8,
+    max_registered_channels_per_user: 10,
+    forbidden_channel_names: [
+      "#services",
+      ~r/^#opers$/
+    ],
+    channel_expire_days: 90,
+    settings: [
+      entrymsg: nil,
+      keeptopic: true,
+      opnotice: true,
+      peace: false,
+      private: false,
+      restricted: false,
+      secure: false,
+      fantasy: true,
+      guard: true,
+      topiclock: false
+    ]
+  ]
+]
+```
+
+## NickServ Configuration
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `true` | Enable or disable NickServ |
+| `min_password_length` | `6` | Minimum password length for registration |
+| `nick_expire_days` | `90` | Days until an inactive nick is deleted |
+| `email_required` | `false` | Whether email is required for registration |
+| `wait_register_time` | `120` | Minimum connection time (seconds) before registering; `0` = disabled |
+| `unverified_expire_days` | `1` | Days until unverified registrations expire; `0` = never |
+| `regain_reservation_duration` | `60` | Seconds a nick is reserved after REGAIN |
+| `recover_reservation_duration` | `60` | Seconds a nick is reserved after RECOVER |
+| `max_access_entries` | `10` | Maximum ACCESS list entries per account |
+
+### NickServ Default Settings
+
+These are the default values for user-configurable settings. Users can change them via `/msg NickServ SET`.
+
+| Setting | Default | User command |
+|---------|---------|-------------|
+| `hide_email` | `false` | `SET HIDEMAIL ON/OFF` |
+
+### Email Verification
+
+When `email_required: true` or when a user provides an email during REGISTER, email verification is required:
+
+1. The server sends a verification code to the email address
+2. The user must run `VERIFY <nick> <code>` within `unverified_expire_days`
+3. If not verified, the registration is automatically deleted
+
+Email delivery uses the configured `Bamboo` adapter (see the mailer config section).
+
+### Nick Expiration
+
+The `RegisteredNickExpiration` background job runs periodically and deletes nicks that haven't been used (logged into) for `nick_expire_days`. The `last_seen_at` timestamp is updated whenever the nick is identified.
+
+## ChanServ Configuration
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `true` | Enable or disable ChanServ |
+| `min_password_length` | `8` | Minimum password length for channel registration |
+| `max_registered_channels_per_user` | `10` | Max channels a single account can register |
+| `forbidden_channel_names` | (see below) | Channel names/patterns that cannot be registered |
+| `channel_expire_days` | `90` | Days until an inactive channel registration is deleted |
+
+### Forbidden Channel Names
+
+The `forbidden_channel_names` list can contain exact strings or Elixir regex patterns:
+
+```elixir
+forbidden_channel_names: [
+  "#services",           # Exact match
+  "#staff",              # Exact match
+  ~r/^#opers$/,          # Regex: exactly #opers
+  ~r/^#admin.*/,         # Regex: any channel starting with #admin
+]
+```
+
+### ChanServ Default Settings
+
+These are the default values applied when a channel is first registered. Channel founders can change them via `/msg ChanServ SET`.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `entrymsg` | `nil` | Message shown to users on join |
+| `keeptopic` | `true` | Restore topic when channel is re-created |
+| `opnotice` | `true` | Notify channel when ChanServ grants ops |
+| `peace` | `false` | Prevent ops from kicking equal-access users |
+| `private` | `false` | Hide channel from ChanServ INFO listing |
+| `restricted` | `false` | Restrict join to users with access |
+| `secure` | `false` | Require NickServ identification for op access |
+| `fantasy` | `true` | Enable `!command` shortcuts in channel |
+| `guard` | `true` | ChanServ stays in channel as guard |
+| `topiclock` | `false` | Only identified users can change topic |
+
+### Channel Expiration
+
+The `RegisteredChannelExpiration` job deletes channel registrations inactive for `channel_expire_days`. Activity is tracked based on channel usage.
+
+## Mailer Configuration
+
+For email functionality (nick verification), configure the mailer:
+
+```elixir
+config :elixircd, ElixIRCd.Utils.Mailer,
+  adapter: Bamboo.LocalAdapter   # Development: stores emails locally
+```
+
+For production with SMTP:
+
+```elixir
+config :elixircd, ElixIRCd.Utils.Mailer,
+  adapter: Bamboo.MuaAdapter,
+  server: "smtp.example.com",
+  port: 587,
+  username: "noreply@example.com",
+  password: "smtppassword",
+  tls: :always
+```
+
+See [Bamboo MUA documentation](https://hexdocs.pm/bamboo_mua/) for full SMTP configuration options.

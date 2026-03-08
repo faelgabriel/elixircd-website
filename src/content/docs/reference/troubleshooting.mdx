@@ -1,0 +1,268 @@
+---
+title: Troubleshooting
+description: Solutions to common ElixIRCd problems.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Connection Problems
+
+### "Connection refused" on port 6697
+
+**Cause:** TLS listener is not started or is misconfigured.
+
+**Check:**
+```bash
+ss -tlnp | grep 6697
+```
+
+If nothing is listening, check:
+1. The listener is configured in `elixircd.exs`
+2. The certificate and key files exist and are readable
+3. Check server logs for listener startup errors
+
+**Common config error:**
+```elixir
+# Wrong — missing ssl options for TLS
+%{transport: :tls, port: 6697}
+
+# Correct
+%{
+  transport: :tls,
+  port: 6697,
+  ssl: [
+    certfile: "/etc/ssl/certs/irc.pem",
+    keyfile:  "/etc/ssl/private/irc.key"
+  ]
+}
+```
+
+### Connection drops during handshake
+
+**Cause:** DNS resolution or ident lookup timeout is causing delay, and the client gives up.
+
+**Check:**
+- Is the server's configured hostname resolvable?
+- Is the client's ident port (113) reachable from the server?
+
+**Fix:** Increase your client's connection timeout. The server will complete the handshake once DNS/ident resolves or times out.
+
+### "Too many connections from your IP"
+
+**Cause:** The connection rate limiter or max connections per IP limit is active.
+
+**Check config:**
+```elixir
+config :elixircd, :rate_limiter,
+  connection: [
+    max_connections_per_ip: 5,  # increase if needed
+    ...
+  ]
+```
+
+Or add an exemption for trusted IPs:
+```elixir
+connection: [
+  exceptions: [ips: ["10.0.0.1"]]
+]
+```
+
+---
+
+## Authentication Problems
+
+### OPER fails with "No O-lines for your host"
+
+**Cause:** Your current hostmask doesn't match any oper entry's `host` pattern.
+
+**Check:**
+- Your current hostname/IP
+- The `host` field in the oper config entry
+- Whether cloaking (`+x`) is affecting your visible hostname
+
+**Fix:** Update the oper `host` to match your actual hostmask, or use `*@*` for testing (not recommended for production).
+
+### NickServ IDENTIFY fails with "Password incorrect"
+
+**Cause:** Wrong password, or the account doesn't exist.
+
+**Check:**
+1. Is the nick registered? `/msg NickServ INFO YourNick`
+2. Are you sending the right password?
+3. Was the registration verified (if email verification is enabled)?
+
+### "You authenticated via SASL. Please /msg NickServ LOGOUT first"
+
+**Cause:** You're trying to use `NickServ IDENTIFY` when already authenticated via SASL.
+
+**Fix:** Either use SASL for auth (don't use IDENTIFY too), or logout first:
+```
+/msg NickServ LOGOUT
+/msg NickServ IDENTIFY yourpassword
+```
+
+### SASL authentication fails
+
+**Cause:** Multiple possibilities — wrong credentials, TLS not in use, or too many failed attempts.
+
+**Check the error numeric:**
+- `904 ERR_SASLFAIL` — wrong username/password, or TLS required but not connected
+- `905 ERR_SASLTOOLONG` — base64 string exceeds 400 characters
+- `906 ERR_SASLABORTED` — you or client sent `AUTHENTICATE *`
+- `907 ERR_SASLALREADY` — already authenticated
+
+**For TLS requirement:** Ensure you're connecting to the TLS port (6697) when SASL requires TLS.
+
+---
+
+## Channel Problems
+
+### "Cannot join channel (+k)" — I know the key
+
+**Cause:** Wrong key, or spaces in the key. Keys cannot contain spaces.
+
+### "Cannot join channel (+i)" — Invite only
+
+**Cause:** You need an invite from a channel operator.
+
+**Fix:** Ask a channel op: `/invite YourNick #channel`
+
+### "Cannot join channel (+b)" — Banned
+
+**Cause:** Your hostmask matches a ban entry.
+
+**Check:** `/mode #channel +b` to see ban list (if you can get in another way or ask an op).
+
+### Channel modes reset after all users leave
+
+**Cause:** The channel is not registered with ChanServ. Unregistered channels are ephemeral.
+
+**Fix:** Register the channel:
+```
+/msg ChanServ REGISTER #yourchannel
+```
+
+---
+
+## Services Problems
+
+### NickServ REGISTER says "Too early to register"
+
+**Cause:** The `wait_register_time` option is configured. Users must be connected for the specified number of seconds before registering.
+
+**Fix:** Wait the required duration (check with the server admin for the exact value).
+
+### Email verification code not received
+
+**Cause:** Email configuration may be misconfigured, or the email went to spam.
+
+**Check:**
+1. Server email configuration (`config :elixircd, :email`)
+2. Spam folder
+3. Server logs for SMTP errors
+
+### ChanServ won't accept TRANSFER
+
+**Cause:** The target user may not be identified to their account.
+
+**Fix:** Target user must authenticate first:
+```
+/msg NickServ IDENTIFY password
+```
+Then retry the transfer.
+
+---
+
+## Performance Problems
+
+### High memory usage
+
+**Check BEAM memory:**
+```elixir
+# From IEx console
+:erlang.memory()
+```
+
+Look for large `:binary` or `:processes` values.
+
+**Common causes:**
+- Large Mnesia tables (many registrations)
+- Many concurrent connections
+- Message queue buildup in a process
+
+**Check top processes by memory:**
+```elixir
+Process.list()
+|> Enum.map(fn pid -> {pid, Process.info(pid, :memory)[:memory]} end)
+|> Enum.sort_by(fn {_, m} -> -m end)
+|> Enum.take(10)
+```
+
+### Slow response to commands
+
+**Check:**
+1. Server load — is the system CPU/memory saturated?
+2. Mnesia query performance with many registrations
+3. Rate limiter is not throttling your test connection
+
+### Many users being disconnected
+
+**Cause:** Rate limiter disconnect threshold may be too aggressive.
+
+**Check config:**
+```elixir
+config :elixircd, :rate_limiter,
+  message: [
+    disconnect_threshold: 10,  # increase if needed
+    ...
+  ]
+```
+
+Or check if the `inactivity_timeout_ms` is too low.
+
+---
+
+## Build / Startup Problems
+
+### Mix compile errors
+
+```bash
+mix deps.get
+mix compile
+```
+
+If there are dependency conflicts, try:
+```bash
+mix deps.clean --all
+mix deps.get
+mix compile
+```
+
+### "Port already in use"
+
+**Cause:** Another process is using the configured port.
+
+**Find it:**
+```bash
+ss -tlnp | grep :6667
+```
+
+Kill it or change the port in the config.
+
+### Mnesia startup error
+
+**Cause:** The Mnesia data directory may have stale/corrupted data.
+
+**Recovery:**
+```bash
+# Warning: this deletes all persistent data
+rm -rf /path/to/Mnesia.elixircd@hostname/
+```
+
+Then restart the server. All registrations will be lost.
+
+<Aside type="caution">
+  Deleting the Mnesia directory removes all registered users and channels. Only do this if data recovery is not possible.
+</Aside>

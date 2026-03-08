@@ -1,0 +1,177 @@
+---
+title: Frequently Asked Questions
+description: Common questions about ElixIRCd.
+sidebar:
+  order: 1
+---
+
+## General
+
+### What is ElixIRCd?
+
+ElixIRCd is an open-source IRC server daemon written in Elixir, running on the BEAM virtual machine. It implements RFC 1459 / RFC 2812 IRC protocol with IRCv3 extensions, built-in services (NickServ, ChanServ), and modern security features.
+
+### Is ElixIRCd production-ready?
+
+ElixIRCd is actively developed and has a complete feature set for running a self-hosted IRC server. It has been tested with major IRC clients. As with any open-source project, review the changelog and test in a staging environment before deploying.
+
+### Why Elixir / BEAM?
+
+The BEAM VM provides:
+- Lightweight processes (millions of concurrent connections possible)
+- Fault-tolerant supervision trees — a crashed handler doesn't take down the server
+- Hot code reloading possibilities
+- Built-in distribution (future federation use cases)
+- Mnesia — an in-memory database with optional disk persistence, built into OTP
+
+### Does ElixIRCd support server-to-server linking?
+
+Not currently. ElixIRCd operates as a single-server IRC network. Server linking (IRC federation) is a future consideration.
+
+---
+
+## Connections
+
+### What ports does ElixIRCd use?
+
+Default ports (all configurable):
+- `6667` — Plain TCP IRC
+- `6697` — TLS IRC
+- `8080` — WebSocket (plain)
+- `8443` — WebSocket + TLS
+
+### Can users connect without TLS?
+
+Yes, if you configure a plain TCP listener. However, SASL PLAIN over plain TCP is disabled by default for security (passwords would be sent unencrypted). You can override this in the SASL configuration.
+
+### Why is my connection slow to complete?
+
+During the connection handshake, ElixIRCd performs asynchronous DNS resolution and ident lookup. If your DNS server is slow or ident (port 113) is unreachable, the handshake may take a few seconds. The server proceeds after a timeout regardless.
+
+---
+
+## Authentication
+
+### How do I register a nickname?
+
+```
+/msg NickServ REGISTER yourpassword youremail@example.com
+```
+
+If email verification is enabled, check your email for a verification code.
+
+### I forgot my NickServ password. What do I do?
+
+There is no password reset via IRC. Ask a server administrator to update or drop the registration.
+
+### What is SASL and should I use it?
+
+SASL (Simple Authentication and Security Layer) allows you to authenticate *before* your connection registration completes. It's the most secure way to authenticate because:
+- You're identified before you can send any messages or join channels
+- You won't get "Nick is registered" notices
+- Channels requiring authentication (`+R`, `+M`) are accessible immediately
+
+Configure SASL in your IRC client with mechanism `PLAIN`, username = your nick, password = your NickServ password.
+
+### Can I use the same account from multiple connections?
+
+Yes. You can be logged in as the same account from multiple connections simultaneously. Each connection registers as a separate user.
+
+---
+
+## Channels
+
+### What channel prefixes are supported?
+
+Only `#` channels are supported. `&` (local), `+` (no modes), and `!` (timestamped) channels are not implemented.
+
+### What characters are allowed in channel names?
+
+Channel names after the `#` prefix must contain only: `a-z`, `A-Z`, `0-9`, `-`, `_`.
+
+### How do I make a channel permanent (survive when empty)?
+
+Register it with ChanServ:
+
+```
+/msg ChanServ REGISTER #yourchannel
+```
+
+Registered channels preserve their topic, modes, and access list even when empty.
+
+### What is the GUARD setting in ChanServ?
+
+When `GUARD` is enabled for a channel, ChanServ joins the channel. This keeps the channel alive (it won't disappear when the last user leaves) even without persistent registration in some IRC server configurations.
+
+---
+
+## Modes
+
+### Why can't I set +r on my nick?
+
+The `+r` (Registered) mode is set only by the server, not by users directly. It's assigned when you successfully authenticate via NickServ IDENTIFY or SASL.
+
+### Why was I de-oped when I ran /mode nick -o?
+
+Removing operator status (`-o`) automatically removes `+H` (hidden oper) and `+s` (server notices) modes, since those modes are only meaningful for operators.
+
+### What does +x do?
+
+`+x` enables hostname cloaking — your real IP/hostname is replaced with a hashed, masked version to protect your privacy. See [Hostname Cloaking](/security/cloaking/) for details.
+
+---
+
+## Services
+
+### NickServ says "Too early to register". Why?
+
+The server may have a `wait_register_time` configured, requiring users to be connected for a minimum number of seconds before registering. Wait and try again.
+
+### Does ChanServ FANTASY work?
+
+Yes, if the channel has `FANTASY` enabled via `SET FANTASY ON`. Fantasy commands let channel members trigger ChanServ commands with `!` prefix in the channel (e.g., `!op`, `!voice`).
+
+### Can I transfer a channel to another user?
+
+Yes: `/msg ChanServ TRANSFER #channel NewOwnerNick`
+
+The target user must be identified to their account.
+
+---
+
+## Security
+
+### How are passwords stored?
+
+All passwords (NickServ, ChanServ registration) are hashed with Argon2id, a memory-hard key derivation function. Plaintext passwords are never stored.
+
+### Can IRC operators read private messages?
+
+No. IRC operators do not have the ability to intercept private messages between users. They can see connection metadata (hostnames, IP addresses) and send server-level messages.
+
+### How does hostname cloaking work?
+
+When `+x` is set, the server replaces your real hostname with `prefix-HASH.domain_parts`. The hash is HMAC-based using the server's secret cloak keys. The cloak is deterministic (same real address → same cloak) so channel bans remain effective.
+
+---
+
+## Administration
+
+### How do I reload the config without restarting?
+
+Use the REHASH command from an IRC operator account:
+
+```
+/rehash
+```
+
+This reloads the config file. Listener changes (adding/removing ports) require a full restart.
+
+### How do I back up user registrations?
+
+User and channel data is stored in Mnesia. Back up the Mnesia data directory. For an online backup:
+
+```elixir
+# From IEx
+:mnesia.backup('/path/to/backup')
+```

@@ -1,0 +1,132 @@
+---
+title: Connecting Clients
+description: How to connect various IRC clients to ElixIRCd.
+sidebar:
+  order: 6
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Connection Details
+
+| Transport | Port | Notes |
+|-----------|------|-------|
+| IRC plaintext | `6667` | Standard TCP, no encryption |
+| IRC SSL/TLS | `6697` | Encrypted with SSL/TLS |
+| WebSocket | `8080` | For web-based clients |
+| WebSocket SSL | `8443` | Encrypted WebSocket |
+
+## Desktop IRC Clients
+
+### HexChat
+
+1. Go to **Server List** → **Add**
+2. Enter your server: `irc.yourserver.com/6667` (or `/6697` for SSL)
+3. For SSL: check **Use SSL**
+4. Optionally set **SASL** for authentication
+
+### WeeChat
+
+```
+/server add myserver irc.yourserver.com/6667
+/server add myserver-ssl irc.yourserver.com/6697 -ssl
+/connect myserver
+```
+
+With SASL authentication:
+```
+/set irc.server.myserver-ssl.sasl_mechanism plain
+/set irc.server.myserver-ssl.sasl_username "YourNick"
+/set irc.server.myserver-ssl.sasl_password "yourpassword"
+```
+
+### Irssi
+
+```
+/connect irc.yourserver.com 6667
+# For SSL:
+/connect -ssl irc.yourserver.com 6697
+```
+
+### Textual (macOS)
+
+Use the **Server Properties** dialog:
+- Server Address: `irc.yourserver.com`
+- Port: `6697`
+- Enable SSL/TLS: Yes
+
+## Web Clients
+
+ElixIRCd supports WebSocket connections, making it compatible with browser-based IRC clients.
+
+### KiwiIRC
+
+KiwiIRC can connect to ElixIRCd's WebSocket endpoint:
+- For HTTP WebSocket: `ws://irc.yourserver.com:8080`
+- For HTTPS WebSocket: `wss://irc.yourserver.com:8443`
+
+### TheLounge
+
+TheLounge can be configured with a WebSocket connection to ElixIRCd.
+
+## IRCv3 Capabilities
+
+ElixIRCd supports many modern IRCv3 capabilities. When you connect, your client will negotiate capabilities during the `CAP` handshake. Features available to clients that request them:
+
+| Capability | What it enables |
+|-----------|----------------|
+| `SASL` | Authenticate before registration completes |
+| `EXTENDED-JOIN` | JOIN messages include account name and real name |
+| `AWAY-NOTIFY` | Real-time away status notifications |
+| `ACCOUNT-NOTIFY` | Notification when users identify/logout |
+| `ACCOUNT-TAG` | Account name attached to messages via message tags |
+| `MESSAGE-TAGS` | Full IRCv3 message tag support |
+| `SERVER-TIME` | Timestamps on messages |
+| `MSGID` | Unique message identifiers |
+| `MULTI-PREFIX` | Multiple status prefixes in NAMES replies |
+| `UHNAMES` | Full user@host in NAMES replies |
+| `CHGHOST` | Real-time hostname change notifications |
+| `INVITE-NOTIFY` | Notification when users are invited to channels |
+| `MONITOR` | Track online/offline status of specific users |
+| `SETNAME` | Change real name during session |
+| `CLIENT-TAGS` | Client-only metadata tags |
+| `STS` | Strict Transport Security (auto-upgrade to TLS) |
+
+<Aside type="tip">
+  Modern clients like HexChat, WeeChat, Textual, and TheLounge automatically negotiate capabilities. You don't need to do anything special — they'll use whatever ElixIRCd supports.
+</Aside>
+
+## SASL Authentication
+
+SASL allows you to authenticate **before** your connection registration completes. This is the most secure way to log in.
+
+### SASL PLAIN
+
+The only supported SASL mechanism is `PLAIN`. The format is base64-encoded `authzid\0authcid\0password`.
+
+Most clients handle SASL automatically. In WeeChat:
+```
+/set irc.server.myserver.sasl_mechanism plain
+/set irc.server.myserver.sasl_username "YourNick"
+/set irc.server.myserver.sasl_password "yourpassword"
+```
+
+<Aside type="note">
+  By default, SASL PLAIN requires a TLS/SSL connection. Attempting PLAIN over plaintext will fail unless you specifically disable `require_tls` in the server config.
+</Aside>
+
+## Verifying Your Connection
+
+After connecting, check your modes with:
+```irc
+/mode YourNick
+```
+
+If connected via TLS, you should see `+Z` (Secure Connection) in your modes.
+
+If you've registered and identified, you should see `+r` (Registered).
+
+Use WHOIS to see your connection info:
+```irc
+/whois YourNick
+```

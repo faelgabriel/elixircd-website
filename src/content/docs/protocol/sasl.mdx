@@ -1,0 +1,151 @@
+---
+title: SASL Authentication
+description: How SASL authentication works in ElixIRCd.
+sidebar:
+  order: 2
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+SASL (Simple Authentication and Security Layer) allows users to authenticate **before** their IRC connection registration completes. This is the most secure way to identify with NickServ.
+
+## Supported Mechanisms
+
+| Mechanism | Status |
+|-----------|--------|
+| PLAIN | ✅ Supported |
+| EXTERNAL | ❌ Not implemented |
+| SCRAM-SHA-256 | ❌ Not implemented |
+
+Only **SASL PLAIN** is supported. It sends credentials as base64-encoded text and **must be used over TLS** (configurable; default: required).
+
+## Authentication Flow
+
+<Steps>
+
+1. **Initiate capability negotiation**
+
+   ```
+   CAP LS 302
+   ```
+   Server responds with available capabilities including `SASL=PLAIN`.
+
+2. **Request SASL**
+
+   ```
+   CAP REQ :SASL
+   ```
+   Server acknowledges: `CAP * ACK :SASL`
+
+3. **Select the PLAIN mechanism**
+
+   ```
+   AUTHENTICATE PLAIN
+   ```
+   Server responds: `AUTHENTICATE +`
+
+4. **Send credentials**
+
+   Format: `authzid\0authcid\0password` (base64 encoded)
+
+   For example, to authenticate as `Alice` with password `secret123`:
+   - String: `\0Alice\0secret123` (authzid is empty)
+   - Base64: `AEFsaWNlAHNlY3JldDEyMw==`
+
+   ```
+   AUTHENTICATE AEFsaWNlAHNlY3JldDEyMw==
+   ```
+
+5. **Receive authentication result**
+
+   Success:
+   ```
+   :server 900 * nick!ident@host Alice :You are now logged in as Alice
+   :server 903 * :SASL authentication successful
+   ```
+
+   Failure:
+   ```
+   :server 904 * :SASL authentication failed
+   ```
+
+6. **Complete registration**
+
+   ```
+   CAP END
+   ```
+   Registration continues with `001 RPL_WELCOME`, etc.
+
+</Steps>
+
+## Computing SASL PLAIN Credentials
+
+The PLAIN message format is: `authzid NUL authcid NUL password`
+
+- `authzid` — authorization identity (usually empty, use the same as authcid)
+- `authcid` — authentication identity (your registered nickname)
+- `password` — your registered password
+
+```python
+# Python example
+import base64
+credentials = "\0Alice\0mysecretpassword"
+encoded = base64.b64encode(credentials.encode()).decode()
+# → "AEFsaWNlAG15c2VjcmV0cGFzc3dvcmQ="
+```
+
+Most IRC clients handle this automatically when you configure SASL.
+
+## Client Configuration Examples
+
+### WeeChat
+
+```
+/server add myserver irc.example.com/6697 -ssl
+/set irc.server.myserver.sasl_mechanism plain
+/set irc.server.myserver.sasl_username "Alice"
+/set irc.server.myserver.sasl_password "mysecretpassword"
+/connect myserver
+```
+
+### HexChat
+
+1. Server List → Edit server
+2. Check "Use SSL"
+3. Login Method: "SASL (username + password)"
+4. Username: `Alice`, Password: `mysecretpassword`
+
+### irssi
+
+```
+/connect -ssl -sasl_mechanism plain -sasl_username Alice -sasl_password mysecretpassword irc.example.com 6697
+```
+
+## Error Cases
+
+| Numeric | Reason |
+|---------|--------|
+| `904 ERR_SASLFAIL` | Wrong username or password |
+| `904 ERR_SASLFAIL` | PLAIN requires TLS but you're on plaintext |
+| `905 ERR_SASLTOOLONG` | Credentials exceeded 400 characters |
+| `906 ERR_SASLABORTED` | You sent `AUTHENTICATE *` to abort |
+| `907 ERR_SASLALREADY` | Already authenticated via SASL |
+| `904 ERR_SASLFAIL` | Too many failed attempts (limit: 3 by default) |
+
+## After SASL Authentication
+
+When SASL succeeds:
+- Your `+r` mode is set (Registered)
+- Your `identified_as` is set to the registered account name
+- `sasl_authenticated` is set to `true`
+
+If you try to use `NickServ IDENTIFY` after SASL authentication, you'll see:
+```
+You authenticated via SASL. Please /msg NickServ LOGOUT first, then IDENTIFY.
+```
+
+To switch accounts: first `/msg NickServ LOGOUT`, then `/msg NickServ IDENTIFY`.
+
+<Aside type="note">
+  SASL authentication happens **during** CAP negotiation, before the IRC connection registration is complete. This means you are authenticated before you even join any channels or send any messages.
+</Aside>

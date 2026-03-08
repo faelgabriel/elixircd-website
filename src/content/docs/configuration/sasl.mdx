@@ -1,0 +1,118 @@
+---
+title: SASL Authentication
+description: Configuring SASL authentication in ElixIRCd.
+sidebar:
+  order: 7
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## SASL Block
+
+```elixir
+sasl: [
+  plain: [
+    enabled: true,
+    require_tls: true
+  ],
+  session_timeout_ms: 60_000,
+  max_attempts_per_connection: 3
+]
+```
+
+## Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `plain.enabled` | `true` | Enable the SASL PLAIN mechanism |
+| `plain.require_tls` | `true` | Require TLS for PLAIN authentication |
+| `session_timeout_ms` | `60_000` | SASL session timeout (ms) |
+| `max_attempts_per_connection` | `3` | Max failed SASL attempts before blocking |
+
+## SASL PLAIN Mechanism
+
+PLAIN is the only supported SASL mechanism. It sends credentials as base64-encoded plaintext.
+
+### require_tls
+
+When `true` (the default), PLAIN authentication is rejected on non-TLS connections:
+```
+:server 904 * :PLAIN mechanism requires TLS connection
+```
+
+This is a security measure to prevent credential exposure. For development, you may set `require_tls: false`, but **never do this in production**.
+
+### Security Consideration
+
+The PLAIN mechanism sends username and password in base64 (which is trivially decodable). It must only be used over TLS to prevent credential interception.
+
+## Session Timeout
+
+If a SASL session is started (client sent `AUTHENTICATE PLAIN`) but not completed within `session_timeout_ms`, the session is automatically expired by the background job `SaslSessionExpiration`.
+
+## Max Attempts
+
+After `max_attempts_per_connection` failed SASL attempts, further AUTHENTICATE commands receive:
+```
+:server 904 * :Too many SASL authentication attempts
+```
+
+The counter resets to 0 after a successful authentication.
+
+## SASL Flow
+
+```
+Client → AUTHENTICATE PLAIN
+Server → AUTHENTICATE +
+Client → AUTHENTICATE <base64(authzid\0authcid\0password)>
+Server → 900 nick!ident@host account :You are now logged in as account
+Server → 903 nick :SASL authentication successful
+```
+
+On failure:
+```
+Server → 904 * :SASL authentication failed
+```
+
+## STS Block
+
+```elixir
+sts: [
+  port: 6697,
+  duration: 2_592_000,
+  preload: false
+]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `port` | `6697` | TLS port to advertise for plaintext upgrade |
+| `duration` | `2_592_000` | Policy cache duration in seconds (30 days) |
+| `preload` | `false` | Allow STS preloading |
+
+**On plaintext connections:** Clients receive `sts=port=6697` in `CAP LS`, telling them which port to use for TLS.
+
+**On TLS connections:** Clients receive `sts=duration=2592000`, telling them to cache the STS policy and always use TLS for this server.
+
+**Common duration values:**
+- `86400` — 1 day
+- `2_592_000` — 30 days (default)
+- `31_536_000` — 1 year
+
+<Aside type="note">
+  STS is only effective if you also require SASL or recommend TLS. It prevents downgrade attacks by having clients that have previously connected via TLS refuse to connect on plaintext in the future.
+</Aside>
+
+## MONITOR Block
+
+```elixir
+monitor: [
+  max_targets: 100
+]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `max_targets` | `100` | Maximum MONITOR targets per user (0 = unlimited) |
+
+When a user tries to add more targets than `max_targets`, they receive `ERR_MONLISTFULL` (734).

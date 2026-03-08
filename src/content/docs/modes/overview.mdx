@@ -1,0 +1,106 @@
+---
+title: Modes Overview
+description: Overview of all IRC modes supported by ElixIRCd.
+sidebar:
+  order: 1
+---
+
+Modes in IRC modify the behavior of users and channels. They are set with the `MODE` command using `+` to add and `-` to remove.
+
+## Types of Modes
+
+| Type | Applies to | Examples |
+|------|-----------|---------|
+| **User Modes** | Individual users globally | `+i`, `+o`, `+r`, `+x` |
+| **Channel Modes** | Channels themselves | `+m`, `+t`, `+k`, `+i` |
+| **Channel List Modes** | Channels with a list of masks | `+b`, `+e`, `+I` |
+| **Channel User Modes** | Users within a specific channel | `+o`, `+v` |
+
+## Quick Reference
+
+### User Modes
+
+| Mode | Name | User settable | Server set | Op only |
+|------|------|:-------------:|:----------:|:-------:|
+| `+B` | Bot | ✅ | | |
+| `+g` | Caller ID | ✅ | | |
+| `+H` | Hide Operator | ✅ | | ✅ |
+| `+i` | Invisible | ✅ | | |
+| `+o` | IRC Operator | | ✅ (via OPER) | |
+| `+r` | Registered | | ✅ (NickServ/SASL) | |
+| `+R` | Registered Only | ✅ | | |
+| `+s` | Server Notices | ✅ | | ✅ |
+| `+w` | Wallops | ✅ | | |
+| `+x` | Cloaked | ✅ | | |
+| `+Z` | Secure | | ✅ (TLS conn.) | |
+
+### Channel Modes
+
+| Mode | Name | Has argument |
+|------|------|:-----------:|
+| `+C` | No CTCP | |
+| `+c` | No Colors | |
+| `+d` | Delay Message | ✅ (seconds) |
+| `+i` | Invite Only | |
+| `+j` | Join Throttle | ✅ (joins:seconds) |
+| `+k` | Key | ✅ (password) |
+| `+l` | Limit | ✅ (count) |
+| `+m` | Moderated | |
+| `+M` | Registered Only Speak | |
+| `+n` | No External Messages | |
+| `+O` | Oper Only | |
+| `+p` | Private | |
+| `+r` | Registered | |
+| `+R` | Registered Only Join | |
+| `+s` | Secret | |
+| `+t` | Topic Lock | |
+| `+T` | No NOTICEs | |
+| `+u` | Auditorium | |
+| `+z` | Secure Only | |
+
+### Channel List Modes
+
+| Mode | Name | Description |
+|------|------|-------------|
+| `+b` | Ban | Prevents matching users from joining |
+| `+e` | Ban Exception | Overrides +b for matching users |
+| `+I` | Invite Exception | Allows matching users to bypass +i |
+
+### Channel User Modes
+
+| Mode | Symbol | Description |
+|------|--------|-------------|
+| `+o` | `@` | Channel operator |
+| `+v` | `+` | Voice |
+
+## Setting Modes
+
+```irc
+# User modes
+MODE yournick +ix       # Set invisible and cloaked
+MODE yournick -i        # Remove invisible
+
+# Channel modes (requires channel op)
+MODE #channel +mtn      # Set moderated, topic-lock, no external
+MODE #channel +k secret # Set channel key
+MODE #channel -m        # Remove moderated
+
+# Channel user modes
+MODE #channel +o Alice  # Give Alice channel op
+MODE #channel +v Bob    # Give Bob voice
+MODE #channel -o Alice  # Remove Alice's op
+
+# List modes
+MODE #channel +b *!*@bad.host.com    # Add ban
+MODE #channel -b *!*@bad.host.com    # Remove ban
+MODE #channel +b                     # List bans
+```
+
+## Mode Interaction Notes
+
+- **+b and +e**: If a user matches both a ban (`+b`) and a ban exception (`+e`), the exception wins and they can join
+- **+i and +I**: If a channel is invite-only (`+i`) and a user matches an invite exception (`+I`), they can join without an explicit invite
+- **+z and +Z**: Channel mode `+z` (secure only) checks that the user has `+Z` (connected via TLS)
+- **+R and +r**: Channel mode `+R` (registered only join) requires the user has `+r` (registered/identified)
+- **+O**: Only IRC operators can set this mode; only IRC operators can join the channel
+- Removing `+o` from yourself removes operator-only modes `+H` and `+s` automatically

@@ -1,0 +1,309 @@
+---
+title: NickServ
+description: Complete reference for the NickServ IRC service in ElixIRCd.
+sidebar:
+  order: 2
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+NickServ allows users to register and manage nicknames, providing authentication and nickname protection services.
+
+## Getting Help
+
+```irc
+/msg NickServ HELP
+/msg NickServ HELP <command>
+```
+
+---
+
+## REGISTER
+
+Register your current nickname.
+
+**Syntax:** `REGISTER <password> [<email>]`
+
+**Example:**
+```irc
+/msg NickServ REGISTER mysecurepass
+/msg NickServ REGISTER mysecurepass user@example.com
+```
+
+**Constraints:**
+- Password must be at least `min_password_length` characters (default: 6)
+- If `email_required: true`, email must be provided
+- If `wait_register_time > 0`, you must have been connected for that many seconds
+- The nickname must not already be registered
+
+**Without email:** The nickname is registered immediately.
+
+**With email:** A verification code is sent to the email address. You must verify within `unverified_expire_days` (default: 1 day).
+
+**After registration:**
+```irc
+/msg NickServ IDENTIFY mysecurepass
+```
+
+<Aside type="note">
+  Passwords are stored as Argon2id hashes. The server never stores your plaintext password.
+</Aside>
+
+---
+
+## VERIFY
+
+Verify a registered nickname via email confirmation.
+
+**Syntax:** `VERIFY <nickname> <code>`
+
+**Example:**
+```irc
+/msg NickServ VERIFY Alice abc12345
+```
+
+Only required when email verification is enabled. The code is sent to the email address provided during REGISTER.
+
+---
+
+## IDENTIFY
+
+Authenticate with your registered nickname.
+
+**Syntax:** `IDENTIFY [<nickname>] <password>`
+
+**Examples:**
+```irc
+/msg NickServ IDENTIFY mypassword
+/msg NickServ IDENTIFY Alice mypassword
+```
+
+**Behavior:**
+- Without nickname: identifies to the registered nick that matches your current nick
+- With nickname: identifies to that specific registered nick (even if your current nick is different)
+- On success: sets your `+r` mode and `identified_as` to the account name
+
+**Conditions that prevent IDENTIFY:**
+- Already identified to a different account → "already identified as X, LOGOUT first"
+- Already identified to the same account → "you are already identified"
+- Authenticated via SASL → "you authenticated via SASL, LOGOUT first"
+
+---
+
+## LOGOUT
+
+Log out from your current NickServ session.
+
+**Syntax:** `LOGOUT`
+
+```irc
+/msg NickServ LOGOUT
+```
+
+**Behavior:**
+- Removes `+r` mode
+- Clears `identified_as`
+- Does **not** disconnect you
+
+---
+
+## GHOST
+
+Disconnect another session that is using your registered nickname.
+
+**Syntax:** `GHOST <nickname> <password>`
+
+**Example:**
+```irc
+/msg NickServ GHOST Alice mypassword
+```
+
+**Behavior:**
+- Disconnects the connection using the specified nickname with the message "This nickname is owned by someone else"
+- Requires authentication — you must provide the correct password for the registered nick
+
+---
+
+## RECOVER
+
+Forcefully disconnect another user using your registered nickname and reserve it for you.
+
+**Syntax:** `RECOVER <nickname> <password>`
+
+**Example:**
+```irc
+/msg NickServ RECOVER Alice mypassword
+```
+
+**Behavior:**
+- Disconnects the user currently using the nick
+- **Reserves the nickname** for `recover_reservation_duration` seconds (default: 60s)
+- During the reservation period, only you can claim the nick
+
+After RECOVER, change your nick to the recovered one:
+```irc
+/nick Alice
+```
+
+---
+
+## REGAIN
+
+Recover your nickname and immediately take it.
+
+**Syntax:** `REGAIN <nickname> <password>`
+
+**Example:**
+```irc
+/msg NickServ REGAIN Alice mypassword
+```
+
+**Behavior:**
+- Similar to RECOVER, but also attempts to change your current nick to the recovered nick
+- The nick is reserved for `regain_reservation_duration` seconds (default: 60s)
+
+---
+
+## RELEASE
+
+Release a reserved nickname before the reservation expires.
+
+**Syntax:** `RELEASE <nickname>`
+
+**Example:**
+```irc
+/msg NickServ RELEASE Alice
+```
+
+**Behavior:**
+- Releases the reservation created by RECOVER or REGAIN
+- After release, anyone can claim the nick
+
+---
+
+## DROP
+
+Permanently delete your registered nickname.
+
+**Syntax:** `DROP <nickname> <password>`
+
+**Example:**
+```irc
+/msg NickServ DROP Alice mypassword
+```
+
+<Aside type="caution">
+  This action is **permanent and cannot be undone**. All registration data for the nickname is deleted.
+</Aside>
+
+---
+
+## INFO
+
+Display information about a registered nickname.
+
+**Syntax:** `INFO <nickname>`
+
+**Example:**
+```irc
+/msg NickServ INFO Alice
+```
+
+**Returns:**
+- Nickname
+- Registration date
+- Last seen date
+- Email address (unless hidden with SET HIDEMAIL ON)
+- Registered by (hostmask at time of registration)
+
+---
+
+## SET
+
+Configure settings for your registered nickname.
+
+**Syntax:** `SET <option> <value>`
+
+**Requirements:** Must be identified (`+r`)
+
+### SET HIDEMAIL
+
+Control whether your email address is shown in NickServ INFO.
+
+```irc
+/msg NickServ SET HIDEMAIL ON     # Hide email in INFO displays
+/msg NickServ SET HIDEMAIL OFF    # Show email in INFO displays
+```
+
+---
+
+## ACCESS
+
+Manage the access list for your registered nickname.
+
+The access list allows automatic identification from trusted hostmasks.
+
+**Syntax:**
+```irc
+/msg NickServ ACCESS ADD *!*@trusted.host.com
+/msg NickServ ACCESS DEL *!*@trusted.host.com
+/msg NickServ ACCESS LIST
+```
+
+**Behavior:**
+- Connections from matching hostmasks are automatically identified without a password
+- Maximum entries: 10 per account (configurable via `max_access_entries`)
+
+---
+
+## ALIST
+
+Display channels or nicknames associated with your account.
+
+**Syntax:** `ALIST`
+
+```irc
+/msg NickServ ALIST
+```
+
+**Returns:** A list of ChanServ-registered channels where you are the founder or successor.
+
+---
+
+## STATUS
+
+Check the identification status of one or more nicknames.
+
+**Syntax:** `STATUS [<nick1> <nick2> ...]`
+
+**Example:**
+```irc
+/msg NickServ STATUS Alice Bob Charlie
+```
+
+**Status codes:**
+| Code | Meaning |
+|------|---------|
+| `0` | Not registered |
+| `1` | Registered but not online |
+| `2` | Online but not identified |
+| `3` | Online and identified |
+
+---
+
+## NickServ Configuration Reference
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `enabled` | `true` | Enable/disable NickServ |
+| `min_password_length` | `6` | Minimum password length |
+| `nick_expire_days` | `90` | Days until inactive nicks expire |
+| `email_required` | `false` | Require email for registration |
+| `wait_register_time` | `120` | Minimum connection time to register (seconds, 0=disabled) |
+| `unverified_expire_days` | `1` | Days until unverified registrations expire (0=never) |
+| `regain_reservation_duration` | `60` | Seconds a nick stays reserved after REGAIN |
+| `recover_reservation_duration` | `60` | Seconds a nick stays reserved after RECOVER |
+| `max_access_entries` | `10` | Maximum ACCESS list entries per nick |
+| `settings.hide_email` | `false` | Default HIDEMAIL setting |
+
+See [Services Configuration](/configuration/services/) for full details.

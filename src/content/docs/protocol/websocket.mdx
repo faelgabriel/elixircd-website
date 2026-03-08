@@ -1,0 +1,140 @@
+---
+title: WebSocket Support
+description: How ElixIRCd exposes IRC over WebSocket connections.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+ElixIRCd supports IRC over WebSocket, allowing browser-based IRC clients to connect without a traditional TCP socket.
+
+## Overview
+
+WebSocket connections carry the same IRC protocol as TCP. The server speaks plain IRC text over the WebSocket frame layer — no JSON, no custom framing. Any WebSocket-capable IRC client can connect.
+
+## Transport Types
+
+ElixIRCd has four transport types:
+
+| Transport | Protocol | Default Port |
+|-----------|----------|-------------|
+| `tcp` | Plain IRC over TCP | 6667 |
+| `tls` | IRC over TLS | 6697 |
+| `ws` | IRC over WebSocket (HTTP) | 8080 |
+| `wss` | IRC over WebSocket + TLS (HTTPS) | 8443 |
+
+## Configuration
+
+WebSocket listeners use the `Bandit` HTTP server instead of `ThousandIsland`. Configure them in your `elixircd.exs`:
+
+```elixir
+config :elixircd, :listeners, [
+  # Standard TCP
+  %{
+    transport: :tcp,
+    ip: {0, 0, 0, 0},
+    port: 6667
+  },
+  # Plain WebSocket
+  %{
+    transport: :ws,
+    ip: {0, 0, 0, 0},
+    port: 8080
+  },
+  # TLS WebSocket
+  %{
+    transport: :wss,
+    ip: {0, 0, 0, 0},
+    port: 8443,
+    ssl: [
+      certfile: "/etc/ssl/certs/irc.example.com.pem",
+      keyfile:  "/etc/ssl/private/irc.example.com.key"
+    ]
+  }
+]
+```
+
+## WebIRC Integration
+
+When browser-based clients connect through a reverse proxy or WebSocket gateway, the real IP address of the end user is hidden — the server only sees the gateway's IP.
+
+WebIRC (`WEBIRC` command) allows trusted gateways to pass the real client IP to the server. This requires the gateway to be pre-authorized in the server config.
+
+```elixir
+config :elixircd, :webirc, [
+  %{
+    password: "gateway-secret",
+    hosts: ["127.0.0.1", "10.0.0.0/8"]
+  }
+]
+```
+
+The gateway sends before any other command:
+
+```
+WEBIRC gateway-secret gateway real-hostname real-ip
+```
+
+The server then uses `real-ip` and `real-hostname` for the connection instead of the gateway's address.
+
+## SASL and WebSocket
+
+SASL authentication works identically over WebSocket. The same `CAP`/`AUTHENTICATE` flow applies. If your WebSocket listener requires TLS, ensure you use a `wss://` endpoint so SASL PLAIN credentials are encrypted.
+
+## Reverse Proxy Setup
+
+For production deployments, place a reverse proxy (nginx, Caddy) in front of the WebSocket port:
+
+### nginx
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name irc.example.com;
+
+    ssl_certificate     /etc/ssl/certs/irc.example.com.pem;
+    ssl_certificate_key /etc/ssl/private/irc.example.com.key;
+
+    location /irc {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header X-Real-IP  $remote_addr;
+        proxy_read_timeout 3600s;
+    }
+}
+```
+
+### Caddy
+
+```
+irc.example.com {
+    handle /irc {
+        reverse_proxy localhost:8080 {
+            header_up Upgrade    {http.request.header.Upgrade}
+            header_up Connection {http.request.header.Connection}
+        }
+    }
+}
+```
+
+<Aside type="note">
+  WebSocket connections are subject to the same rate limiting, SASL requirements, and channel/mode rules as TCP connections. The transport layer is transparent to all IRC features.
+</Aside>
+
+## Compatible Web Clients
+
+Any web-based IRC client that supports raw IRC over WebSocket will work:
+
+- **KiwiIRC** — can connect to `wss://irc.example.com:8443`
+- **TheLounge** — proxy mode connects via TCP, but embedded mode supports WebSocket
+- **Gamja** — lightweight browser client supporting WebSocket IRC
+- **Ergo's webchat** — works with any IRCv3-capable server
+
+## Identifying WebSocket Connections
+
+The server internally tracks the transport type per connection. In WHOIS responses, there is no external indication of whether a user is on TCP vs WebSocket — they appear identical to other users.
+
+Administrators can see transport type in server logs and the internal user state.

@@ -1,0 +1,186 @@
+---
+title: Operator Guide
+description: How to use IRC operator privileges effectively and safely.
+sidebar:
+  order: 1
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+IRC operators (IRCops) have elevated privileges on the server. This guide covers obtaining operator status, common tasks, and best practices.
+
+## Becoming an Operator
+
+Operator credentials are defined in the server configuration under `:opers`. Each entry specifies a username, hashed password, and the host patterns the credential is usable from.
+
+<Steps>
+
+1. **Ensure you have an oper entry in the config**
+
+   ```elixir
+   config :elixircd, :opers, [
+     %{
+       name: "AdminNick",
+       password: "$argon2id$...",   # hashed with Argon2id
+       host: "*@*"                  # host mask
+     }
+   ]
+   ```
+
+2. **Connect to the server and authenticate (if required)**
+
+   If your server requires SASL or NickServ identification before OPER, do that first.
+
+3. **Use the OPER command**
+
+   ```
+   /oper AdminNick yourpassword
+   ```
+
+   On success:
+   ```
+   :server 381 yournick :You are now an IRC Operator
+   ```
+
+   On failure:
+   ```
+   :server 491 yournick :No O-lines for your host
+   ```
+
+4. **Verify your status**
+
+   ```
+   /whois yournick
+   ```
+
+   You should see line 313:
+   ```
+   :server 313 yournick yournick :is an IRC Operator
+   ```
+
+</Steps>
+
+<Aside type="caution">
+  The OPER password is sent in plaintext in the IRC protocol. **Always connect over TLS** (port 6697 or configured TLS port) before using the OPER command.
+</Aside>
+
+## Operator Modes
+
+After OPER, you receive the `+o` user mode. Two additional modes are useful:
+
+| Mode | Description |
+|------|-------------|
+| `+H` | Hides your operator status from non-operators' WHOIS |
+| `+s` | Enables server notice delivery to you |
+
+Enable them after OPER:
+
+```
+/mode yournick +Hs
+```
+
+## Common Operator Tasks
+
+### Disconnect a User
+
+```
+/kill BadNick :Reason for disconnect
+```
+
+This disconnects the user immediately with the given reason. The user can reconnect immediately — KILL is not a ban.
+
+### Broadcast Messages
+
+```
+/operwall :Message to all operators
+/wallops :Message to all users with +w mode
+/globops :Message to all operators
+```
+
+### Reload Configuration
+
+After editing `elixircd.exs`:
+
+```
+/rehash
+```
+
+This applies configuration changes without restarting the server. Active connections are preserved.
+
+### Change a User's Hostname
+
+```
+/chghost TargetNick newhostname.example.com
+```
+
+This changes the visible hostname in the user's hostmask. Users in shared channels with `chghost` capability will see a notification.
+
+### Restart or Shut Down
+
+```
+/restart   # Restarts the server process
+/die       # Shuts down the server
+```
+
+<Aside type="caution">
+  `/die` terminates the server process. All connected users will be disconnected. Use only when intentional.
+</Aside>
+
+### View Server Statistics
+
+```
+/stats u    # Server uptime
+/stats c    # Configured connections
+/stats o    # Operator entries
+/stats l    # Link info
+```
+
+## Staying Low-Profile
+
+When doing routine moderation, consider enabling `+H` to avoid drawing attention:
+
+```
+/mode yournick +H
+```
+
+Other operators can still see your operator status in WHOIS. Non-operators cannot.
+
+To de-oper when done:
+
+```
+/mode yournick -o
+```
+
+Removing `+o` automatically removes `+H` and `+s` as well.
+
+## Oper-Only Channel Mode (+O)
+
+Channels with `+O` mode set can only be joined by IRC operators:
+
+```
+/mode #oper-channel +O
+```
+
+Operators automatically bypass this restriction.
+
+## Security Best Practices
+
+1. **Use strong, unique passwords** — never reuse passwords across services
+2. **Always OPER over TLS** — the password is visible in plaintext on plain TCP
+3. **Use `+H` during routine work** — stay low-profile when not doing visible moderation
+4. **De-oper when finished** — `/mode yournick -o` drops all operator privileges
+5. **Restrict the host mask** — use specific IP or range instead of `*@*` in oper config
+6. **Keep oper count minimal** — only trusted administrators should have oper access
+7. **Monitor operator actions** — use server notices (`+s`) to watch for suspicious activity
+
+## Hashing Operator Passwords
+
+Never store plaintext passwords in the config. Use Argon2id to hash the password:
+
+```elixir
+# In an IEx session against your ElixIRCd node:
+Argon2.hash_pwd_salt("yourpassword")
+# Returns: "$argon2id$v=19$m=65536,t=3,p=4$..."
+```
+
+Paste the hash into the oper config `password` field.

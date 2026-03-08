@@ -1,0 +1,142 @@
+---
+title: Connection Commands
+description: Commands used during and after connection to the IRC server.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## PASS
+
+Set a connection password before registering.
+
+**Syntax:** `PASS <password>`
+
+**When:** Must be sent before `NICK` and `USER` if the server requires a password.
+
+**Behavior:**
+- The password is checked during the handshake when registration completes
+- If the server has no password configured (`password: nil`), any PASS value is accepted
+- If the password does not match, the connection is closed with `ERROR :Bad Password`
+
+**Example:**
+```irc
+PASS serverpassword
+```
+
+---
+
+## NICK
+
+Set or change your nickname.
+
+**Syntax:** `NICK <nickname>`
+
+**Constraints:**
+- Maximum length: 30 characters (configurable via `max_nick_length`)
+- Must not be in use by another connected user
+- Cannot be a reserved nickname (in reservation period after RECOVER/REGAIN)
+- Comparison is case-insensitive using the server's case mapping
+
+**Behavior:**
+- During pre-registration: sets the nick for the upcoming handshake
+- After registration: changes your current nick; broadcasts the change to all shared channels and users
+
+**Example:**
+```irc
+NICK Alice
+NICK Alice_Away
+```
+
+**Errors:**
+- `433 ERR_NICKNAMEINUSE` — nick is already taken
+- `432 ERR_ERRONEUSNICKNAME` — invalid nick format
+- `484 ERR_NICKNAMEINUSE` — nick is reserved (custom error)
+
+---
+
+## USER
+
+Provide your username, hostname hints, and real name during registration.
+
+**Syntax:** `USER <username> <hostname> <servername> :<realname>`
+
+**Fields:**
+| Field | Usage | Limit |
+|-------|-------|-------|
+| `username` | ident/username | 10 chars (`max_ident_length`) |
+| `hostname` | ignored (server resolves it) | — |
+| `servername` | ignored | — |
+| `realname` | real name (GECOS) | 50 chars (`max_realname_length`) |
+
+<Aside type="note">
+  The `hostname` and `servername` fields in USER are accepted but ignored — the server always resolves the real hostname via DNS. The ident may be overridden by the ident service if `ident_service.enabled = true`.
+</Aside>
+
+**Example:**
+```irc
+USER alice 0 * :Alice Wonderland
+```
+
+---
+
+## PING
+
+Test whether the connection is still alive. Clients typically send this to the server.
+
+**Syntax:** `PING <token>`
+
+**Behavior:**
+- The server responds immediately with `PONG :<token>`
+- Also resets the user's inactivity timer
+
+**Example:**
+```irc
+PING LAG1234567890
+```
+
+Server response:
+```irc
+:server.hostname PONG server.hostname :LAG1234567890
+```
+
+---
+
+## PONG
+
+Reply to a server-initiated PING. The server sends PING to clients to check liveness.
+
+**Syntax:** `PONG <token>`
+
+**Behavior:**
+- Resets the user's inactivity timer
+- No visible response from the server
+
+<Aside type="tip">
+  Most IRC clients handle PING/PONG automatically. You rarely need to send PONG manually.
+</Aside>
+
+---
+
+## QUIT
+
+Disconnect from the server gracefully.
+
+**Syntax:** `QUIT [:<message>]`
+
+**Behavior:**
+- Broadcasts a QUIT message to all channels the user is in
+- The user's information is saved to WHOWAS history
+- The connection is closed
+
+**Example:**
+```irc
+QUIT :Going to sleep
+QUIT :Goodbye!
+```
+
+The quit message appears to other users as:
+```
+* Alice has quit (Going to sleep)
+```

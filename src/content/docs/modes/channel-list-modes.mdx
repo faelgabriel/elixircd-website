@@ -1,0 +1,146 @@
+---
+title: Channel List Modes
+description: Reference for ban, exception, and invite exception list modes.
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Channel list modes maintain lists of hostmask patterns. Each entry in a list applies to users whose `nick!ident@hostname` matches the pattern.
+
+## Mask Format
+
+All list modes use IRC hostmask format: `nick!ident@hostname`
+
+Wildcards:
+- `*` — matches zero or more characters
+- `?` — matches exactly one character
+
+**Examples:**
+```
+*!*@192.168.1.100           # Specific IP
+*!*@*.spammer.net           # Entire domain
+BadNick!*@*                 # Specific nick regardless of host
+*!badident@*                # Specific ident
+Alice!*@*                   # User with nick "Alice"
+```
+
+---
+
+## +b — Ban
+
+**Purpose:** Prevent users matching the mask from joining the channel.
+
+**Setting a ban:**
+```irc
+MODE #channel +b *!*@baduser.host.com
+MODE #channel +b SpamBot!*@*
+```
+
+**Removing a ban:**
+```irc
+MODE #channel -b *!*@baduser.host.com
+```
+
+**Listing bans:**
+```irc
+MODE #channel +b
+```
+(or just `MODE #channel b`)
+
+**Behavior:**
+- Masks are normalized on set (e.g., unanchored patterns get `*` prefix/suffix)
+- A banned user cannot join the channel and receives `ERR_BANNEDFROMCHAN`
+- A user who is **already in** the channel is not kicked by being banned — use KICK to remove them
+- If the user also matches a ban exception (`+e`), they are allowed in (exception wins)
+- Maximum entries: 100 (configurable via `max_list_entries: %{"b" => 100}`)
+
+**Response format:**
+```
+:server 367 yournick #channel mask setter timestamp
+:server 368 yournick #channel :End of channel ban list
+```
+
+---
+
+## +e — Ban Exception
+
+**Purpose:** Exempt users matching the mask from channel bans (`+b`).
+
+**Setting an exception:**
+```irc
+MODE #channel +e TrustedUser!*@*
+MODE #channel +e *!*@trusted.host.org
+```
+
+**Removing an exception:**
+```irc
+MODE #channel -e *!*@trusted.host.org
+```
+
+**Listing exceptions:**
+```irc
+MODE #channel +e
+```
+
+**Behavior:**
+- If a user matches a ban (`+b`) but also matches an exception (`+e`), **the exception takes priority** and they can join
+- Exceptions do not override invite-only (`+i`) — for that, use invite exceptions (`+I`)
+
+**Response format:**
+```
+:server 348 yournick #channel mask setter timestamp
+:server 349 yournick #channel :End of channel exception list
+```
+
+---
+
+## +I — Invite Exception
+
+**Purpose:** Allow users matching the mask to join an invite-only (`+i`) channel without an explicit invite.
+
+**Setting an invite exception:**
+```irc
+MODE #channel +I TrustedUser!*@*
+MODE #channel +I *!*@staff.mynetwork.org
+```
+
+**Removing an invite exception:**
+```irc
+MODE #channel -I *!*@staff.mynetwork.org
+```
+
+**Listing invite exceptions:**
+```irc
+MODE #channel +I
+```
+
+**Behavior:**
+- Only relevant when the channel has `+i` set
+- Users matching `+I` can join the channel as if they had been explicitly invited
+- This does **not** override bans — a banned user matching `+I` is still banned
+- Explicit invites (from `INVITE`) are stored separately and work independently
+
+**Response format:**
+```
+:server 346 yournick #channel mask setter timestamp
+:server 347 yournick #channel :End of channel invite list
+```
+
+---
+
+## Interaction Summary
+
+| User situation | Channel modes | Result |
+|----------------|--------------|--------|
+| Matches +b, no +e | +i not set | Cannot join (banned) |
+| Matches +b, matches +e | +i not set | Can join (exception overrides ban) |
+| Matches +b, matches +I | +i set | Cannot join (banned; +I doesn't override ban) |
+| Matches +I, no +b | +i set | Can join (invite exception) |
+| Has explicit invite, matches +b | | Cannot join (banned) |
+| Has explicit invite, no +b | +i set | Can join |
+
+<Aside type="tip">
+  The invite exception (`+I`) is specifically for bypassing `+i` (invite only). To also bypass a ban, you need a ban exception (`+e`). If you want someone to be able to join despite both a ban and invite-only restriction, you need both `+e` and `+I` matching them, or just remove the ban.
+</Aside>

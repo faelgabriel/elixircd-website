@@ -1,0 +1,85 @@
+/* ElixIRCd documentation custom styles */
+
+:root {
+  --sl-color-accent-low: #1e293b;
+  --sl-color-accent: #6366f1;
+  --sl-color-accent-high: #818cf8;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #ecf0f2;
+  --sl-color-gray-2: #c0ccd4;
+  --sl-color-gray-3: #8ca1b0;
+  --sl-color-gray-4: #44617b;
+  --sl-color-gray-5: #2c3e50;
+  --sl-color-gray-6: #1a2633;
+  --sl-color-black: #0d1520;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #eef2ff;
+  --sl-color-accent: #4f46e5;
+  --sl-color-accent-high: #312e81;
+}
+
+/* Code blocks */
+.sl-markdown-content code {
+  font-size: 0.875em;
+}
+
+/* Command reference styling */
+.command-name {
+  font-family: var(--sl-font-mono);
+  font-weight: 700;
+  color: var(--sl-color-accent-high);
+}
+
+/* Mode badge */
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-family: var(--sl-font-mono);
+  font-size: 0.8em;
+  font-weight: 600;
+  background: var(--sl-color-accent-low);
+  color: var(--sl-color-accent-high);
+  border: 1px solid var(--sl-color-accent);
+}
+
+/* Table improvements */
+.sl-markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.sl-markdown-content th {
+  background: var(--sl-color-gray-6);
+  font-weight: 600;
+}
+
+.sl-markdown-content tr:nth-child(even) {
+  background: var(--sl-color-gray-7, rgba(0,0,0,0.1));
+}
+
+/* Status badges */
+.badge-implemented {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.badge-partial {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.badge-not-implemented {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* Hero improvements */
+.hero-tagline {
+  font-size: 1.25rem;
+  opacity: 0.85;
+}

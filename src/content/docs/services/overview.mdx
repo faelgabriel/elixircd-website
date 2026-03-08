@@ -1,0 +1,85 @@
+---
+title: IRC Services Overview
+description: Overview of the integrated IRC services in ElixIRCd.
+sidebar:
+  order: 1
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+ElixIRCd includes **integrated IRC services** — there is no need to connect external services software like Atheme or Anope. NickServ and ChanServ are built directly into the server.
+
+## Available Services
+
+<CardGrid>
+  <Card title="NickServ" icon="approve-check-circle">
+    Nickname registration and authentication service. Allows users to register, identify, and protect their nicknames.
+
+    [View NickServ documentation →](/services/nickserv/)
+  </Card>
+  <Card title="ChanServ" icon="setting">
+    Channel registration and management service. Allows users to register channels and configure their settings.
+
+    [View ChanServ documentation →](/services/chanserv/)
+  </Card>
+</CardGrid>
+
+## How to Use Services
+
+Services are IRC bots — you communicate with them via `/msg`:
+
+```irc
+/msg NickServ HELP
+/msg ChanServ HELP
+```
+
+## Service Configuration
+
+Both services are configured in `elixircd.exs` under the `services` key:
+
+```elixir
+services: [
+  nickserv: [
+    enabled: true,
+    # ...
+  ],
+  chanserv: [
+    enabled: true,
+    # ...
+  ]
+]
+```
+
+Either service can be disabled independently. See [Services Configuration](/configuration/services/).
+
+## Service Bots
+
+When services are enabled, they appear as virtual users in the server:
+
+- **NickServ** — appears as `NickServ!NickServ@services.` (or similar)
+- **ChanServ** — appears as `ChanServ!ChanServ@services.`
+
+<Aside type="note">
+  Services commands are handled internally by the server process — they do not require separate daemon processes or external connections. Everything runs within the same Elixir application.
+</Aside>
+
+## Currently Not Implemented
+
+The following service commands are **listed but not yet implemented** (marked ❌ in the feature list):
+
+**NickServ:**
+- `GROUP` — group a nickname with your account
+- `UNGROUP` — remove a nickname from your group
+- `LISTCHANS` — list channels where you have access
+
+**ChanServ (most management commands):**
+- `ACCESS` — manage channel access list
+- `ALIST` — display channel access list entries
+- `FLAGS` — manage user flags and permissions
+- `OP`, `DEOP`, `VOICE`, `DEVOICE` — grant/revoke privileges
+- `KICK`, `BAN`, `UNBAN` — moderation actions
+- `INVITE` — invite users
+- `TOPIC` — set topic
+- `CLEAR` — clear channel settings
+- `STATUS` — check access level
+- `SYNC` — synchronize with access list

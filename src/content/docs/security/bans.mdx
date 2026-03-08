@@ -1,0 +1,109 @@
+---
+title: Bans & Restrictions
+description: Managing bans, exceptions, and channel restrictions in ElixIRCd.
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Channel Bans
+
+Channel operators can ban users by hostmask using the `+b` mode:
+
+```irc
+MODE #channel +b *!*@bad.host.com
+MODE #channel +b SpamBot!*@*
+MODE #channel +b *!badident@*
+```
+
+See [Channel List Modes](/modes/channel-list-modes/) for full ban documentation.
+
+### Ban Mask Normalization
+
+When a ban is set, the mask is normalized:
+- Incomplete masks are expanded to full `nick!ident@host` format
+- For example, `*@bad.host.com` is normalized to `*!*@bad.host.com`
+
+### Ban Limits
+
+By default, each channel can have up to **100 ban entries** (configurable via `max_list_entries: %{"b" => 100}`).
+
+## Ban Exceptions (+e)
+
+Ban exceptions allow specific users to bypass bans:
+
+```irc
+MODE #channel +e TrustedUser!*@*
+```
+
+If a user matches both a ban (`+b`) and an exception (`+e`), they **can join** (exception wins).
+
+## Access Restrictions by Mode
+
+| Mode | Restriction |
+|------|-------------|
+| `+i` | Invite only — requires invite or +I exception |
+| `+k` | Key — requires correct channel password |
+| `+l` | Limit — channel at capacity |
+| `+R` | Registered only — must be identified (+r) |
+| `+O` | Oper only — must be an IRC operator |
+| `+z` | Secure only — must be on TLS (+Z) |
+| `+j` | Join throttle — rate limited |
+
+## User-Level Restrictions
+
+### Caller ID (+g)
+
+Users can enable Caller ID to only receive messages from trusted users:
+```irc
+MODE yournick +g
+ACCEPT +TrustedFriend
+```
+
+See [User Modes — +g](/modes/user-modes/#g--caller-id).
+
+### Registered Only (+R for users)
+
+Users can block messages from unregistered users:
+```irc
+MODE yournick +R
+```
+
+### SILENCE
+
+Users can silence specific hostmasks (messages are silently dropped):
+```irc
+SILENCE +*!*@spammer.example.com
+```
+
+See [SILENCE command](/commands/user-info/#silence).
+
+## Kicking Users
+
+Channel operators can remove users from channels:
+```irc
+KICK #channel BadUser :Violated channel rules
+```
+
+<Aside type="note">
+  Kicking does not ban. The kicked user can rejoin unless also banned.
+</Aside>
+
+## IRC Operator Actions
+
+IRC operators can:
+- **KILL** — forcefully disconnect a user from the entire server:
+  ```irc
+  KILL spambot :Automated spam
+  ```
+
+## Server-Level Connection Limits
+
+Connection-level restrictions apply before users even complete registration:
+
+- `max_connections_per_ip` — max simultaneous connections from one IP
+- Connection rate throttle — token bucket per IP
+- IP blocking after repeated violations
+
+See [Rate Limiting](/configuration/rate-limiting/) for configuration.

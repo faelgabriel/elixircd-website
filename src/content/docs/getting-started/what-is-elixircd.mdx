@@ -1,0 +1,112 @@
+---
+title: What is ElixIRCd?
+description: An introduction to ElixIRCd, its architecture, and what makes it different from other IRC servers.
+sidebar:
+  order: 2
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+## Overview
+
+**ElixIRCd** is a full IRC server (IRCd) daemon written in [Elixir](https://elixir-lang.org/), a functional, concurrent programming language that runs on the Erlang virtual machine (BEAM). It is designed to provide a robust and highly concurrent environment for running IRC networks.
+
+Unlike many legacy IRC daemons written in C, ElixIRCd takes advantage of:
+
+- **BEAM process model** — each user connection is an isolated lightweight process
+- **Mnesia in-memory database** — all server state (users, channels, bans) lives in an ETS-based in-memory store with no disk persistence between restarts
+- **OTP supervision trees** — automatic process restart and fault isolation
+- **Elixir's functional nature** — immutable data and pattern matching for predictable behavior
+
+## What It Implements
+
+ElixIRCd is a single-server IRC daemon. It implements:
+
+| Category | Details |
+|----------|---------|
+| **IRC Protocol** | RFC 1459, RFC 2810, RFC 2811, RFC 2812, RFC 2813, RFC 7194 |
+| **IRCv3 Capabilities** | SASL, account-tag, account-notify, away-notify, chghost, extended-join, invite-notify, multi-prefix, message-tags, server-time, msgid, monitor, setname, uhnames, extended-uhlist, client-tags, sts, cap-notify, invite-extended |
+| **Integrated Services** | NickServ (nickname registration) and ChanServ (channel registration) |
+| **Transports** | TCP, TLS, WebSocket (HTTP), WebSocket (HTTPS/WSS) |
+| **Authentication** | SASL PLAIN, NickServ password authentication |
+| **Security** | Hostname cloaking, rate limiting, SSL/TLS |
+
+## What It Does NOT Implement
+
+It is important to understand what is **not** in scope for the current version:
+
+- **Server-to-server (S2S) linking** — ElixIRCd runs as a single-server IRC network. There is no spanning tree, no server federation, and no S2S protocol support
+- **Horizontal scalability** — cannot be clustered across multiple machines
+- **BATCH capability** — IRCv3 batch is not implemented
+- **Echo-message** — clients do not receive copies of their own messages via IRCv3
+- **Labeled-response** — not implemented
+- **WHOX (extended WHO)** — the advanced WHO query format is not supported
+
+## Architecture Summary
+
+```
+┌──────────────────────────────────────────────────────┐
+│                     ElixIRCd                         │
+│                                                      │
+│  Listeners (ThousandIsland / Bandit)                 │
+│   TCP :6667  TLS :6697  WS :8080  WSS :8443          │
+│                    │                                 │
+│  Connection Handler (per user, BEAM process)         │
+│   ├── Handshake (DNS, ident, welcome sequence)       │
+│   ├── CAP Negotiation + SASL Authentication          │
+│   ├── Command Dispatcher                             │
+│   └── Rate Limiter                                  │
+│                    │                                 │
+│  In-Memory State (Mnesia/ETS)                        │
+│   ├── Users, Channels, UserChannels                  │
+│   ├── Bans, Exceptions, Invites, Invex               │
+│   ├── NickServ / ChanServ registrations              │
+│   ├── SASL Sessions                                  │
+│   └── Monitor targets                               │
+│                    │                                 │
+│  IRC Services                                        │
+│   ├── NickServ                                       │
+│   └── ChanServ                                       │
+│                    │                                 │
+│  Background Jobs                                     │
+│   ├── Nick expiration                                │
+│   ├── Channel expiration                             │
+│   ├── Unverified nick cleanup                        │
+│   ├── SASL session expiration                        │
+│   └── Verification email delivery                   │
+└──────────────────────────────────────────────────────┘
+```
+
+<Aside type="note">
+All state is stored in-memory. **Restarting the server clears all user sessions, but registered nicknames and channels are persisted** through Mnesia's ETS tables which survive in-process restarts but not application restarts unless Mnesia disk persistence is configured.
+
+In the default configuration, registered nicks and channels are lost on full server restart. For production, consider Mnesia disk tables or regular state export.
+</Aside>
+
+## IRC Protocol Compliance
+
+ElixIRCd follows the core IRC RFCs closely:
+
+- **RFC 1459** — Internet Relay Chat Protocol (core protocol)
+- **RFC 2810** — IRC Architecture
+- **RFC 2811** — IRC Channel Management
+- **RFC 2812** — IRC Client Protocol
+- **RFC 2813** — IRC Server Protocol (partial; S2S not implemented)
+- **RFC 7194** — Default Port for IRC via TLS/SSL (port 6697)
+
+## Technology Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Language | Elixir 1.19+ |
+| Runtime | Erlang/OTP (BEAM VM) |
+| Database | Mnesia (in-memory ETS tables via `memento` library) |
+| TCP/TLS Server | ThousandIsland |
+| WebSocket Server | Bandit |
+| Password hashing | Argon2id (`argon2_elixir`) |
+| Rate limiting | Hammer (token bucket algorithm) |
+| Email delivery | Bamboo + Bamboo MUA (SMTP) |
+
+## License
+
+ElixIRCd is licensed under the **AGPL-3.0** (GNU Affero General Public License v3). This means any modifications you deploy over a network must also be open-sourced under AGPL.

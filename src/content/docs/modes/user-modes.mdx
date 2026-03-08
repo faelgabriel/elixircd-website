@@ -1,0 +1,204 @@
+---
+title: User Modes
+description: Complete reference for all user modes in ElixIRCd.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+User modes apply globally to a user, affecting their visibility and behavior across the entire server.
+
+**Syntax:** `MODE <yournick> +<modes>` or `MODE <yournick> -<modes>`
+
+---
+
+## +B — Bot
+
+**Set by:** User
+**Removed by:** User
+**Purpose:** Marks the user as a bot.
+
+When set, this mode identifies the user as an automated bot. It is purely informational — it appears in WHOIS and is broadcast via IRCv3 message tags to clients that support the bot tag (`MESSAGE-TAGS` capability).
+
+```irc
+MODE mybotnick +B
+```
+
+---
+
+## +g — Caller ID
+
+**Set by:** User
+**Removed by:** User
+**Purpose:** Only users on your ACCEPT list can send you private messages.
+
+When `+g` is set:
+- PRIVMSGs from users not on your ACCEPT list are blocked
+- The sender receives a notification that you have Caller ID enabled
+- You receive a one-time notification per session when someone tries to message you (so you can decide to add them)
+
+Manage your accept list:
+```irc
+MODE yournick +g          # Enable Caller ID
+ACCEPT +Alice             # Allow Alice to message you
+ACCEPT -Bob               # Remove Bob from your accept list
+ACCEPT *                  # View your accept list
+```
+
+<Aside type="tip">
+  The ACCEPT list is per-session. It is cleared when you disconnect. Use `+g` if you want to control who can message you, especially useful for bots or well-known users who don't want unsolicited DMs.
+</Aside>
+
+---
+
+## +H — Hide Operator
+
+**Set by:** IRC Operators only
+**Removed by:** IRC Operators only
+**Purpose:** Hides your IRC operator status from non-operators in WHOIS.
+
+When set:
+- Non-operators doing `/whois` on you will not see the "is an IRC Operator" line
+- IRC operators doing `/whois` on you will still see your operator status
+- This allows operators to be "undercover"
+
+```irc
+MODE yournick +H    # Hide op status (must already have +o)
+MODE yournick -H    # Show op status again
+```
+
+<Aside type="note">
+  When you de-oper (remove `+o`), `+H` is automatically removed as well.
+</Aside>
+
+---
+
+## +i — Invisible
+
+**Set by:** User
+**Removed by:** User
+**Purpose:** Hides you from WHO and WHOIS searches by users not in shared channels.
+
+When set:
+- `/who` searches will not show you unless the searching user shares a channel with you
+- `/whois` from users not in shared channels may show limited information
+- You still appear in channel NAMES lists to people in those channels
+
+```irc
+MODE yournick +i
+```
+
+---
+
+## +o — IRC Operator
+
+**Set by:** Server only (via OPER command)
+**Removed by:** User (via `/mode yournick -o`) or server
+**Purpose:** Elevated server-wide operator privileges.
+
+This mode cannot be self-set. It is only granted by the `OPER` command after successful authentication.
+
+Removing it de-opers you and automatically removes `+H` and `+s` if set.
+
+See [Operators](/core-concepts/operators/) for full documentation.
+
+---
+
+## +r — Registered
+
+**Set by:** Server only (via NickServ IDENTIFY or SASL authentication)
+**Removed by:** Server only (via NickServ LOGOUT)
+**Purpose:** Indicates the user is identified with NickServ.
+
+This mode cannot be manually set or removed. It is automatically applied when you identify successfully, and removed when you log out.
+
+It enables access to `+R` channels and ability to speak in `+M` channels.
+
+---
+
+## +R — Registered Only
+
+**Set by:** User
+**Removed by:** User
+**Purpose:** Only registered (`+r`) users can send you private messages.
+
+When set:
+- Unregistered users who try to PRIVMSG you receive an error
+- Registered users (those with `+r`) can message you normally
+
+```irc
+MODE yournick +R    # Only registered users can DM you
+MODE yournick -R    # Allow all users to DM you
+```
+
+---
+
+## +s — Server Notices (Snomask)
+
+**Set by:** IRC Operators only
+**Removed by:** IRC Operators only
+**Purpose:** Receive server notice messages.
+
+When set, the operator receives server-level notices such as:
+- Client connection events
+- Other operator-level server events
+
+```irc
+MODE yournick +s    # Enable server notices (must be +o)
+```
+
+<Aside type="note">
+  When you de-oper (remove `+o`), `+s` is automatically removed as well.
+</Aside>
+
+---
+
+## +w — Wallops
+
+**Set by:** User
+**Removed by:** User
+**Purpose:** Receive WALLOPS broadcast messages from operators.
+
+IRC operators can send `WALLOPS` messages to all users with `+w` enabled. This is commonly used for server-wide announcements.
+
+```irc
+MODE yournick +w    # Start receiving WALLOPS
+MODE yournick -w    # Stop receiving WALLOPS
+```
+
+---
+
+## +x — Cloaked Hostname
+
+**Set by:** User
+**Removed by:** User (unless `cloak_allow_disable: false` in config)
+**Purpose:** Replace your real hostname with a cloaked (masked) version.
+
+When set:
+- Your hostname is replaced with `prefix-HASH.domainparts` in your visible hostmask
+- The hash is deterministic — the same real hostname always produces the same cloak
+- Bans on your cloaked hostname continue to work
+
+Example: `alice@192.168.1.100` → `alice@elixir-A3F2B1C8.home.isp.com`
+
+```irc
+MODE yournick +x    # Enable hostname cloaking
+MODE yournick -x    # Remove cloaking (if allowed by server config)
+```
+
+If `cloak_on_connect: true` is set in the server config, `+x` is applied automatically when you connect.
+
+See [Hostname Cloaking](/security/cloaking/) for details.
+
+---
+
+## +Z — Secure Connection
+
+**Set by:** Server only (automatic for TLS connections)
+**Removed by:** Cannot be removed
+**Purpose:** Indicates the user is connected via SSL/TLS.
+
+This mode is automatically set when you connect using TLS (port 6697 or WebSocket over HTTPS). It cannot be set or removed manually.
+
+It is required to join channels with `+z` (Secure Only) mode.

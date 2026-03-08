@@ -1,0 +1,178 @@
+---
+title: Glossary
+description: Definitions of IRC and ElixIRCd-specific terms.
+sidebar:
+  order: 3
+---
+
+## A
+
+**Account**
+A registered identity in NickServ, consisting of a nickname, password, and associated metadata. Multiple connections can share the same account simultaneously.
+
+**AUTHENTICATE**
+The IRC command used during SASL authentication to exchange credentials with the server.
+
+**Away**
+A user state indicating the user is not actively present. Set with the `AWAY` command. Shown in WHOIS and NAMES replies.
+
+## B
+
+**Ban** (`+b`)
+A channel list mode that prevents users matching a hostmask from joining. Bans are stored persistently for registered channels.
+
+**Ban Exception** (`+e`)
+A channel list mode that exempts a specific hostmask from matching bans.
+
+**BEAM**
+The Erlang virtual machine on which Elixir (and ElixIRCd) runs. Known for high concurrency, fault tolerance, and low-latency process scheduling.
+
+## C
+
+**CAP**
+The IRC capability negotiation command. Clients use `CAP LS`, `CAP REQ`, `CAP ACK`, and `CAP END` to negotiate IRCv3 features with the server.
+
+**ChanServ**
+The channel services bot. Manages registered channel ownership, access lists, settings, and persistence.
+
+**Cloak / Cloaking**
+Replacing a user's real IP address or hostname with a hashed, masked version (`+x` mode). Protects user privacy.
+
+**Cloak Key**
+The secret HMAC key used to generate hostname cloaks. Must be kept private.
+
+**CTCP**
+Client-to-Client Protocol. A set of conventions for sending structured data over IRC PRIVMSG/NOTICE. Common uses: `VERSION`, `TIME`, `PING`. The `+C` channel mode disables CTCP.
+
+## D
+
+**DNS Lookup**
+During the connection handshake, ElixIRCd performs a reverse DNS lookup on the connecting IP to determine the user's hostname.
+
+## E
+
+**ERR_SASLFAIL** (`904`)
+Numeric reply sent when SASL authentication fails (wrong credentials, TLS required, too many attempts).
+
+## G
+
+**GECOS**
+The "real name" field in a user's identity, set via the `USER` command or updated with `SETNAME`. Historically stands for General Electric Comprehensive Operating System, but in IRC context simply means the user's display name.
+
+**Ghost**
+A stale connection holding a nickname. The `NickServ GHOST` command disconnects it.
+
+## H
+
+**Handshake**
+The process of completing a new IRC connection: CAP negotiation, SASL (optional), NICK, USER, async DNS/ident, then the welcome sequence (001–004, LUSERS, ISUPPORT, MOTD).
+
+**Hostmask**
+The `nick!ident@host` string identifying an IRC user. Used in ban masks, access lists, and oper configurations.
+
+## I
+
+**Ident / Identd**
+A protocol (RFC 1413) where the server queries the client's machine on port 113 to verify the username. ElixIRCd performs this lookup during the connection handshake.
+
+**Invite-Only** (`+i`)
+A channel mode requiring users to be invited before joining.
+
+**IRCop / IRC Operator**
+A user with elevated server-level privileges, obtained via the `OPER` command. Can disconnect users, broadcast messages, reload config, etc.
+
+**IRCv3**
+A set of modern IRC protocol extensions built on top of RFC 2812. Includes capabilities, message tags, SASL, and more. See [IRCv3.net](https://ircv3.net).
+
+**ISUPPORT** (`005`)
+A numeric sent during the welcome sequence advertising server feature tokens (e.g., `CHANTYPES=#`, `MODES=4`, `MAXCHANNELS=20`).
+
+## L
+
+**List Mode**
+A channel mode that maintains a list of entries (ban `+b`, exception `+e`, invex `+I`). Multiple entries can be added with repeated `MODE` commands.
+
+## M
+
+**Mnesia**
+The distributed database system built into OTP/Erlang, used by ElixIRCd to store registered users, channels, and access lists.
+
+**MONITOR**
+An IRCv3 command for efficiently tracking user presence (online/offline notifications). More efficient than `WATCH` (legacy).
+
+**MOTD**
+Message of the Day. Sent to users during the welcome sequence. Displayed with `/motd`.
+
+## N
+
+**Nick collision**
+When a user tries to take a nick already in use. The server sends `433 ERR_NICKNAMEINUSE`.
+
+**NickServ**
+The nickname services bot. Manages nickname registration, authentication, and account settings.
+
+## O
+
+**O-line**
+An oper configuration entry. Short for "Operator line," from traditional IRC server config file syntax.
+
+## P
+
+**PRIVMSG**
+The primary IRC command for sending messages — to channels (`PRIVMSG #channel :text`) or users (`PRIVMSG Nick :text`).
+
+## R
+
+**Registered** (`+r`)
+A user mode set by the server when a user is authenticated. Channels with `+R` or `+M` modes check for this flag.
+
+**REHASH**
+An operator command that reloads the server configuration file without restarting.
+
+## S
+
+**SASL**
+Simple Authentication and Security Layer. A framework for authentication. ElixIRCd supports SASL PLAIN over the IRC AUTHENTICATE command.
+
+**Server Notice**
+A message from the server to operators with `+s` mode, reporting events like new connections or rate limit violations.
+
+**Services**
+Bot programs (NickServ, ChanServ) that provide nickname and channel management features. In ElixIRCd, services are built into the server process.
+
+**STS**
+Strict Transport Security. An IRCv3 capability that tells clients to always connect over TLS. Non-requestable — informational only.
+
+## T
+
+**ThousandIsland**
+The TCP/TLS socket library used by ElixIRCd for plain IRC connections.
+
+**Token Bucket**
+The algorithm used by ElixIRCd's rate limiter. Users accumulate tokens over time and spend them on messages. When tokens run out, messages are throttled.
+
+**TLS**
+Transport Layer Security. Encrypts the IRC connection. Use port 6697 for TLS IRC.
+
+## U
+
+**Umodes**
+User modes. Flags applied to a specific user's connection. See [User Modes](/modes/user-modes/).
+
+## V
+
+**Vhost**
+Virtual host. Another term for a cloaked hostname (see Cloak).
+
+## W
+
+**WebIRC**
+A mechanism allowing trusted gateways to pass the real client IP address to the server via the `WEBIRC` command.
+
+**WebSocket**
+A bidirectional protocol over HTTP that allows browsers to maintain persistent connections. ElixIRCd supports IRC over WebSocket (`:ws`) and WebSocket+TLS (`:wss`).
+
+## Z
+
+**Z-Line**
+Not implemented in ElixIRCd (would be a server-wide IP ban). Use firewall rules for IP-level blocking.

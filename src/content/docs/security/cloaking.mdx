@@ -1,0 +1,84 @@
+---
+title: Hostname Cloaking
+description: How hostname cloaking works in ElixIRCd and what it means for users.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## What is Hostname Cloaking?
+
+Hostname cloaking (also called vhost or vhosts) replaces a user's real hostname with a masked version. This protects user privacy by preventing other users from seeing their real IP address or hostname.
+
+**Without cloaking:**
+```
+Alice!alice@home.isp.net
+```
+
+**With cloaking (+x):**
+```
+Alice!alice@elixir-A3F2B1C8.isp.net
+```
+
+## Enabling Cloaking
+
+Users enable cloaking by setting the `+x` mode:
+```irc
+MODE yournick +x    # Enable cloaking
+MODE yournick -x    # Disable cloaking (if allowed)
+```
+
+The server admin can configure auto-cloaking (`cloak_on_connect: true`) so all users get `+x` automatically when they connect.
+
+## How the Cloak is Generated
+
+ElixIRCd generates cloaks using **HMAC-based hashing** with the server's configured `cloak_keys`. The process:
+
+1. Takes the user's real IP address and hostname
+2. Applies an HMAC hash using the server's secret keys
+3. Constructs `prefix-HASH.domain_parts` as the cloaked hostname
+
+**Key properties:**
+- **Deterministic**: Same real address → same cloak (so bans still work)
+- **Secret-key dependent**: Without the server's keys, the real address cannot be recovered from the cloak
+- **Domain-preserving**: The last N domain segments are kept visible (configurable)
+
+## What Cloaking Protects Against
+
+- Other users seeing your real IP address or hostname in your hostmask
+- DDoS attacks targeting specific users (they can't see your IP)
+- ISP-based targeting and profiling
+
+## What Cloaking Does NOT Protect
+
+- IRC operators can see your real hostname (via WHOIS with operator privileges)
+- The server itself knows your real IP at all times
+- Bans on your cloaked hostname apply (this is intentional — bans work across sessions)
+
+## Banning Cloaked Users
+
+When banning a user with an active cloak, use their **cloaked hostname** in the ban mask:
+
+```irc
+MODE #channel +b *!*@elixir-A3F2B1C8.isp.net
+```
+
+The ban will apply to the same user next time they connect because the cloak is deterministic.
+
+## Admin Configuration
+
+| Option | Description |
+|--------|-------------|
+| `enabled: true` | Turn cloaking on or off globally |
+| `cloak_keys` | Secret HMAC keys (keep these secret!) |
+| `cloak_prefix` | Prefix for cloaked hosts (e.g., `"elixir"`) |
+| `cloak_on_connect: true` | Auto-apply `+x` on connect |
+| `cloak_allow_disable: false` | Prevent users from removing `+x` |
+| `cloak_domain_parts: 2` | Number of domain parts to preserve |
+
+See [Cloaking Configuration](/configuration/cloaking/) for details.
+
+<Aside type="caution">
+  **Protect your cloak keys.** Anyone with access to the server's `cloak_keys` can compute what real hostname maps to a given cloak, breaking user privacy.
+</Aside>

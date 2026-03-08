@@ -1,0 +1,90 @@
+---
+title: Channel User Modes
+description: Reference for per-channel user privilege modes in ElixIRCd.
+sidebar:
+  order: 5
+---
+
+Channel user modes are assigned to **individual users within a specific channel**. They control the user's privileges in that channel only.
+
+## +o — Channel Operator
+
+**Symbol:** `@`
+**Grants:** Full channel management privileges
+
+**Setting:**
+```irc
+MODE #channel +o Alice    # Give Alice channel op
+MODE #channel -o Alice    # Remove Alice's channel op
+```
+
+**What channel operators can do:**
+- Kick users from the channel (`KICK`)
+- Set and remove channel modes
+- Add and remove bans (`+b`), exceptions (`+e`), invite exceptions (`+I`)
+- Grant/revoke voice (`+v`) and operator (`+o`) to other users
+- Change the topic (always, even with `+t` set)
+
+**Automatic grant:**
+- The **first user to join** a newly created channel automatically receives `+o`
+
+**With MULTI-PREFIX capability:**
+A user can have both `+o` and `+v`. They are displayed as `@+Nick` in NAMES replies.
+
+---
+
+## +v — Voice
+
+**Symbol:** `+`
+**Grants:** Ability to speak in moderated channels
+
+**Setting:**
+```irc
+MODE #channel +v Bob    # Give Bob voice
+MODE #channel -v Bob    # Remove Bob's voice
+```
+
+**What voiced users can do:**
+- Speak in channels with `+m` (Moderated) mode set
+- See join/part/quit messages in channels with `+u` (Auditorium) mode
+
+**Without voice:**
+- In `+m` channels: regular users without `+v` or `+o` cannot send messages
+- In `+u` channels: regular users without `+v` or `+o` don't see join/part/quit events
+
+---
+
+## Privilege Display
+
+In NAMES replies and channel lists, user privileges are shown as prefixes:
+
+| Status | Prefix | Example |
+|--------|--------|---------|
+| Channel Operator | `@` | `@Alice` |
+| Voice | `+` | `+Bob` |
+| No status | (none) | `Charlie` |
+
+With `MULTI-PREFIX` capability, users with multiple statuses show all prefixes:
+```
+@+Alice    ← op and voice
+@Bob       ← op only
++Carol     ← voice only
+Dave       ← no status
+```
+
+---
+
+## Transferring Ops
+
+A channel operator can give ops to others and then remove their own ops:
+
+```irc
+MODE #channel +o NewOp
+MODE #channel -o myownNick
+```
+
+Or give ops while leaving:
+```irc
+MODE #channel +o Alice
+PART #channel :Transferring channel to Alice
+```

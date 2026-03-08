@@ -1,0 +1,220 @@
+---
+title: IRCv3 Commands
+description: Modern IRC commands and extensions implemented in ElixIRCd.
+sidebar:
+  order: 8
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## CAP
+
+Negotiate IRCv3 capabilities between client and server.
+
+**Subcommands:**
+- `CAP LS [302]` — list available capabilities
+- `CAP REQ <capabilities>` — request capabilities
+- `CAP ACK <capabilities>` — server acknowledges (server-side only)
+- `CAP NAK <capabilities>` — server rejects (server-side only)
+- `CAP LIST` — list your currently enabled capabilities
+- `CAP END` — end capability negotiation and proceed with registration
+
+**Behavior:**
+- Sending `CAP LS` enters capability negotiation mode, which **blocks registration completion** (the `001 RPL_WELCOME`) even if NICK and USER have been sent
+- This allows SASL authentication to complete before registration
+- `CAP END` releases the block and proceeds with the handshake
+- Capabilities can be enabled/disabled with `+` and `-` prefixes in `CAP REQ`
+
+**Example:**
+```
+→ CAP LS 302
+← :server CAP * LS :SASL=PLAIN EXTENDED-JOIN AWAY-NOTIFY MESSAGE-TAGS SERVER-TIME MSGID MULTI-PREFIX UHNAMES ACCOUNT-TAG ACCOUNT-NOTIFY CHGHOST CLIENT-TAGS INVITE-EXTENDED INVITE-NOTIFY CAP-NOTIFY SETNAME EXTENDED-UHLIST MONITOR sts=port=6697
+
+→ CAP REQ :SASL EXTENDED-JOIN AWAY-NOTIFY MULTI-PREFIX
+← :server CAP * ACK :SASL EXTENDED-JOIN AWAY-NOTIFY MULTI-PREFIX
+
+→ AUTHENTICATE PLAIN
+← :server AUTHENTICATE +
+
+→ AUTHENTICATE <base64_credentials>
+← :server 900 * nick!ident@host accountname :You are now logged in as accountname
+← :server 903 * :SASL authentication successful
+
+→ CAP END
+← (registration continues: 001, 002, 003, etc.)
+```
+
+**Non-requestable capabilities:**
+- `STS` — informational only; included in `CAP LS` but cannot be `CAP REQ`'d
+
+---
+
+## AUTHENTICATE
+
+SASL authentication during the connection handshake.
+
+**Syntax:** `AUTHENTICATE <mechanism|data|*>`
+
+**Flow:**
+1. Request `SASL` capability in `CAP REQ`
+2. `AUTHENTICATE PLAIN` — select the PLAIN mechanism
+3. Server responds: `AUTHENTICATE +`
+4. Send base64-encoded credentials: `AUTHENTICATE <base64>`
+5. Server responds with 900/903 (success) or 904 (failure)
+
+**Aborting SASL:**
+```
+AUTHENTICATE *
+```
+
+**PLAIN format:**
+The credential string before base64 encoding is: `authzid\0authcid\0password`
+
+For example, to login as `Alice` with password `secret`:
+```
+\0Alice\0secret
+```
+Base64 encoded: `AEFsaWNlAHNlY3JldA==`
+
+**Constraints:**
+- Only valid during CAP negotiation (`cap_negotiating = true`)
+- Only valid before registration (`registered = false`)
+- Maximum of 3 failed attempts per connection (configurable via `max_attempts_per_connection`)
+- PLAIN requires TLS unless `require_tls: false` is configured
+- Each AUTHENTICATE message has a maximum length of 400 characters
+
+**Errors:**
+| Numeric | Meaning |
+|---------|---------|
+| `904 ERR_SASLFAIL` | Authentication failed |
+| `905 ERR_SASLTOOLONG` | Message too long |
+| `906 ERR_SASLABORTED` | SASL aborted |
+| `907 ERR_SASLALREADY` | Already authenticated |
+| `908 RPL_SASLMECHS` | Available mechanisms list |
+
+<Aside type="note">
+  After successful SASL authentication, you receive the `+r` mode and your `identified_as` is set to the registered account name. You cannot use `NickServ IDENTIFY` after SASL authentication without first doing `NickServ LOGOUT`.
+</Aside>
+
+---
+
+## ACCOUNT
+
+Account change notification (server-generated).
+
+This is sent **by the server** to clients with the `ACCOUNT-NOTIFY` capability when a user identifies or logs out.
+
+**Format:**
+```
+:nick!ident@host ACCOUNT accountname
+:nick!ident@host ACCOUNT *
+```
+
+- `accountname` — user has identified to this account
+- `*` — user has logged out
+
+---
+
+## TAGMSG
+
+Send a message with tags but no text content.
+
+**Syntax:** `TAGMSG <target>`
+
+**Behavior:**
+- Sends message tags without a text body (useful for reactions, typing indicators, etc.)
+- Requires `MESSAGE-TAGS` capability
+- The message is delivered with whatever client-only tags the sender includes
+
+**Example:**
+```
+@+react=👍 TAGMSG #channel
+```
+
+---
+
+## MONITOR
+
+Track when specific users go online or offline.
+
+**Syntax:**
+- `MONITOR + <nick1>[,<nick2>,...]` — add to monitor list
+- `MONITOR - <nick1>[,<nick2>,...]` — remove from monitor list
+- `MONITOR L` — list your monitor targets
+- `MONITOR C` — clear your monitor list
+- `MONITOR S` — show current status of all monitored targets
+
+**Behavior:**
+- Efficient alternative to ISON polling
+- When a monitored user connects: you receive `730 RPL_MONONLINE`
+- When a monitored user disconnects: you receive `731 RPL_MONOFFLINE`
+- Maximum targets per user: 100 (configurable via `monitor.max_targets`)
+- Requires `MONITOR` capability
+
+**Responses:**
+- `730 RPL_MONONLINE` — monitored user came online
+- `731 RPL_MONOFFLINE` — monitored user went offline
+- `732 RPL_MONLIST` — your monitor list
+- `733 RPL_ENDOFMONLIST` — end of monitor list
+- `734 ERR_MONLISTFULL` — monitor list is full
+
+**Example:**
+```irc
+MONITOR + Alice,Bob,Charlie
+MONITOR S
+MONITOR - Bob
+```
+
+---
+
+## SETNAME
+
+Change your real name (GECOS) during an active session.
+
+**Syntax:** `SETNAME :<new real name>`
+
+**Behavior:**
+- Updates your visible real name immediately
+- Other users with `SETNAME` capability receive a `SETNAME` notification
+- Requires `SETNAME` capability to be negotiated
+
+**Constraints:**
+- Maximum real name length: 50 characters
+
+**Example:**
+```irc
+SETNAME :Alice Smith (away)
+```
+
+---
+
+## CHGHOST
+
+Change a user's visible hostname. (Operator command; see also [Operator Commands](/commands/operator/#chghost))
+
+When a hostname change occurs, users in shared channels who have the `CHGHOST` capability receive a notification:
+```
+:nick!ident@oldhostname CHGHOST ident newhost
+```
+
+---
+
+## WEBIRC
+
+Identify as a WebIRC gateway to pass the real user's IP and hostname.
+
+**Syntax:** `WEBIRC <password> <gateway> <hostname> <ip> [options]`
+
+**Behavior:**
+- Must be sent before NICK/USER
+- The gateway must be configured in `webirc.gateways` with matching IP and password
+- Sets the user's real IP and hostname to the provided values
+- Optional `secure` flag indicates the client connected via HTTPS/WSS to the gateway
+
+**Example:**
+```
+WEBIRC gatewaypassword kiwiirc user.hostname.com 203.0.113.45
+WEBIRC gatewaypassword kiwiirc user.hostname.com 203.0.113.45 :secure=1
+```
+
+See [WebIRC Configuration](/configuration/webirc/) for setup details.

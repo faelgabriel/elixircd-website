@@ -1,0 +1,114 @@
+---
+title: ElixIRCd Documentation
+description: ElixIRCd is a modern IRC server written in Elixir, leveraging the Erlang VM for high concurrency and reliability.
+template: doc
+---
+
+import { Card, CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+
+**ElixIRCd** is an open-source IRC server daemon written in [Elixir](https://elixir-lang.org), running on the Erlang VM (BEAM). It implements the standard IRC protocol (RFC 1459 / RFC 2812) with full IRCv3 support, built-in services (NickServ and ChanServ), TLS/WebSocket listeners, and modern security features.
+
+## Get Started
+
+<CardGrid>
+  <LinkCard
+    title="Quick Start"
+    href="/getting-started/quick-start/"
+    description="Run ElixIRCd in minutes using Docker or from source."
+  />
+  <LinkCard
+    title="Configuration"
+    href="/getting-started/configuration/"
+    description="Learn how to configure your server."
+  />
+  <LinkCard
+    title="Connecting Clients"
+    href="/getting-started/connecting-clients/"
+    description="Connect your first IRC client."
+  />
+  <LinkCard
+    title="Feature Inventory"
+    href="/reference/feature-inventory/"
+    description="Complete list of all implemented features."
+  />
+</CardGrid>
+
+## Features
+
+<CardGrid>
+  <Card title="High Concurrency" icon="approve-check">
+    Built on the Erlang VM. Handles thousands of simultaneous connections
+    with lightweight BEAM processes and no shared-state locks.
+  </Card>
+  <Card title="Built-in IRC Services" icon="star">
+    NickServ and ChanServ are embedded — no external services process
+    (Atheme, Anope) required. Accounts and channels survive restarts
+    via Mnesia.
+  </Card>
+  <Card title="IRCv3 Capabilities" icon="open-book">
+    SASL PLAIN, message-tags, away-notify, extended-join, multi-prefix,
+    server-time, msgid, account-notify, monitor, setname, chghost, and
+    more.
+  </Card>
+  <Card title="TLS & WebSocket" icon="seti:lock">
+    Native TLS on port 6697. WebSocket support (plain and TLS) for
+    browser clients like KiwiIRC and Gamja. All four transports can
+    run simultaneously.
+  </Card>
+  <Card title="Hostname Cloaking" icon="laptop">
+    HMAC-based hostname masking (`+x` mode). Deterministic cloaks
+    protect user privacy while keeping channel bans effective across
+    sessions.
+  </Card>
+  <Card title="Rate Limiting" icon="warning">
+    Token-bucket rate limiter at connection and message level, with
+    per-command overrides, IP/mask exemptions, and configurable
+    disconnect thresholds.
+  </Card>
+</CardGrid>
+
+## Reference Sections
+
+<CardGrid>
+  <LinkCard title="Commands" href="/commands/overview/" description="All IRC commands with syntax and behavior" />
+  <LinkCard title="User Modes" href="/modes/user-modes/" description="All supported user mode flags" />
+  <LinkCard title="Channel Modes" href="/modes/channel-modes/" description="All supported channel mode flags" />
+  <LinkCard title="NickServ" href="/services/nickserv/" description="Nickname registration and account management" />
+  <LinkCard title="ChanServ" href="/services/chanserv/" description="Channel registration and settings" />
+  <LinkCard title="Configuration Reference" href="/configuration/overview/" description="Complete config file documentation" />
+  <LinkCard title="IRCv3 Capabilities" href="/protocol/capabilities/" description="Supported IRCv3 extensions" />
+  <LinkCard title="SASL Authentication" href="/protocol/sasl/" description="SASL PLAIN flow and client setup" />
+</CardGrid>
+
+## Supported IRC Protocol
+
+| Standard | Description |
+|----------|-------------|
+| RFC 1459 | Original IRC protocol |
+| RFC 2810 | IRC Architecture |
+| RFC 2811 | IRC Channel Management |
+| RFC 2812 | IRC Client Protocol |
+| RFC 2813 | IRC Server Protocol |
+| RFC 7194 | Default Port for IRC via TLS |
+| IRCv3 | Modern IRC extensions (capabilities, tags, SASL) |
+
+## Transport & Ports
+
+| Transport | Default Port | Description |
+|-----------|-------------|-------------|
+| TCP | 6667 | Plain IRC |
+| TLS | 6697 | IRC over TLS (recommended) |
+| WebSocket | 8080 | IRC over WebSocket |
+| WebSocket + TLS | 8443 | IRC over WebSocket + TLS |
+
+All ports are configurable. Multiple listeners of each type can run simultaneously.
+
+<Aside type="note">
+  ElixIRCd is a **single-server** IRC daemon. Server-to-server linking (federation) is not implemented.
+</Aside>
+
+## Links
+
+- **Source code:** [github.com/faelgabriel/elixircd](https://github.com/faelgabriel/elixircd)
+- **Issue tracker:** [github.com/faelgabriel/elixircd/issues](https://github.com/faelgabriel/elixircd/issues)
+- **License:** MIT

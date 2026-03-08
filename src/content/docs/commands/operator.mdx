@@ -1,0 +1,203 @@
+---
+title: Operator Commands
+description: Commands available to IRC operators for server administration.
+sidebar:
+  order: 6
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution">
+  All commands on this page require IRC operator status (`+o` mode). You obtain operator status with the `OPER` command.
+</Aside>
+
+## OPER
+
+Authenticate as an IRC operator.
+
+**Syntax:** `OPER <name> <password>`
+
+**Behavior:**
+- Credentials are checked against the `operators` list in `elixircd.exs`
+- Passwords are verified using Argon2id hashing
+- On success: you receive `+o` mode and a `RPL_YOUREOPER` (381) message
+- On failure: `ERR_NOOPERHOST` (491) or `ERR_PASSWDMISMATCH` (464)
+
+<Aside type="caution">
+  Always use OPER over a TLS connection. The password is sent as plaintext in the OPER command.
+</Aside>
+
+**Example:**
+```irc
+/oper admin mypassword
+```
+
+---
+
+## KILL
+
+Forcefully disconnect a user from the server.
+
+**Syntax:** `KILL <nick> <reason>`
+
+**Behavior:**
+- The target user is disconnected with a "Killed" message showing who killed them and the reason
+- The kill is broadcast as a server notice to operators
+
+**Example:**
+```irc
+KILL spambot :Automated spam detected
+KILL troublemaker :Repeated violations
+```
+
+---
+
+## WALLOPS
+
+Broadcast a message to all users who have `+w` (Wallops) mode set.
+
+**Syntax:** `WALLOPS :<message>`
+
+**Behavior:**
+- Message is sent to all users with `+w` mode enabled
+- Regular users can enable `+w` to receive these announcements
+- Commonly used for server announcements
+
+**Example:**
+```irc
+WALLOPS :The server will restart for maintenance in 5 minutes.
+```
+
+---
+
+## OPERWALL
+
+Send a message visible only to IRC operators.
+
+**Syntax:** `OPERWALL :<message>`
+
+**Behavior:**
+- Message is sent only to connected IRC operators
+- Regular users do not see OPERWALL messages
+- Used for operator-to-operator communication
+
+**Example:**
+```irc
+OPERWALL :Anyone else seeing connection floods from 192.168.1.x?
+```
+
+---
+
+## GLOBOPS
+
+Send a global operator message to all operators.
+
+**Syntax:** `GLOBOPS :<message>`
+
+**Behavior:**
+- Broadcasts to all connected IRC operators
+- Similar to OPERWALL in the current single-server implementation
+
+**Example:**
+```irc
+GLOBOPS :Maintenance window starts in 30 minutes.
+```
+
+---
+
+## REHASH
+
+Reload the server configuration without restarting.
+
+**Syntax:** `REHASH`
+
+**Behavior:**
+- Reloads `elixircd.exs` from disk
+- Configuration changes take effect for new connections
+- Active connections are not affected immediately (they continue with their existing state)
+
+**Example:**
+```irc
+REHASH
+```
+
+Response:
+```
+:server 382 yournick elixircd.exs :Rehashing
+```
+
+---
+
+## RESTART
+
+Restart the server.
+
+**Syntax:** `RESTART`
+
+**Behavior:**
+- Broadcasts a server restart notice to all connected users
+- The server process restarts
+- **All connections are dropped** during restart
+- In-memory state (channels, users, etc.) is cleared; registered nicks/channels may be lost
+
+<Aside type="caution">
+  RESTART disconnects all users. Use with care in production environments.
+</Aside>
+
+---
+
+## DIE
+
+Shut down the server.
+
+**Syntax:** `DIE`
+
+**Behavior:**
+- Broadcasts a shutdown notice to all connected users
+- The server process exits cleanly
+- **All connections are closed**
+
+<Aside type="caution">
+  DIE permanently stops the server. You must manually restart it.
+</Aside>
+
+---
+
+## CHGHOST
+
+Change a user's visible hostname.
+
+**Syntax:** `CHGHOST <nick> <newhost>`
+
+**Behavior:**
+- Changes the target user's visible hostname to `<newhost>`
+- The user's real IP/hostname is preserved internally; this only changes the displayed hostname
+- If `CHGHOST` capability is enabled, other users in shared channels receive a `CHGHOST` message
+
+**Example:**
+```irc
+CHGHOST Alice staff.mynetwork.org
+```
+
+---
+
+## STATS
+
+View server statistics.
+
+**Syntax:** `STATS <letter>`
+
+**Available stats letters:**
+
+| Letter | Information |
+|--------|------------|
+| `u` | Server uptime |
+| `o` | Configured operators |
+| `l` | Server connection information (links) |
+| `m` | Command usage counts |
+
+**Example:**
+```irc
+STATS u    # Show uptime
+STATS o    # Show configured operators
+```

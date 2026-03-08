@@ -1,0 +1,100 @@
+---
+title: WebIRC Gateways
+description: Configuring WebIRC gateway support in ElixIRCd.
+sidebar:
+  order: 9
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## WebIRC Block
+
+```elixir
+webirc: [
+  enabled: false,
+  gateways: [
+    # %{
+    #   ips: ["192.168.1.100", "10.0.0.0/8"],
+    #   password: "secure_gateway_password",
+    #   name: "KiwiIRC Gateway"
+    # }
+  ],
+  verify_hostname: false,
+  allow_ipv6: true
+]
+```
+
+## What is WebIRC?
+
+WebIRC is a mechanism that allows web-based IRC gateways (like KiwiIRC, The Lounge, or custom gateways) to pass the **real client IP and hostname** to the IRC server.
+
+Without WebIRC, all web clients appear to come from the gateway server's IP address. With WebIRC, the IRC server sees the real user's IP address and hostname.
+
+## Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `false` | Enable or disable WebIRC support |
+| `gateways` | `[]` | List of authorized gateway configurations |
+| `verify_hostname` | `false` | Verify that the provided hostname resolves to the IP |
+| `allow_ipv6` | `true` | Allow IPv6 addresses from gateways |
+
+## Gateway Configuration
+
+Each gateway entry must have:
+
+| Field | Required | Description |
+|-------|---------|-------------|
+| `ips` | ✅ | List of IP addresses or CIDR ranges for this gateway |
+| `password` | ✅ | Authentication password for the gateway |
+| `name` | ✅ | Human-readable name for this gateway |
+
+## Example Configuration
+
+```elixir
+webirc: [
+  enabled: true,
+  gateways: [
+    %{
+      ips: ["192.168.1.100"],
+      password: "kiwiirc_gateway_secret",
+      name: "KiwiIRC"
+    },
+    %{
+      ips: ["10.0.0.0/8"],       # Internal network range
+      password: "internal_gw_secret",
+      name: "Internal Gateway"
+    }
+  ],
+  verify_hostname: false,
+  allow_ipv6: true
+]
+```
+
+## How WebIRC Works
+
+1. The gateway connects to the IRC server and immediately sends:
+   ```
+   WEBIRC <password> <gateway_name> <user_hostname> <user_ip> [options]
+   ```
+
+2. The server verifies:
+   - WebIRC is enabled
+   - The gateway's connecting IP matches one of the `ips` in its configuration
+   - The password matches
+
+3. If valid, the user's `ip_address` and `hostname` are set to the gateway-provided values
+
+4. The connection proceeds normally from there
+
+**WEBIRC must be sent before NICK/USER.**
+
+## Security Considerations
+
+<Aside type="caution">
+  Only add trusted, secure gateways to the WebIRC list. A compromised gateway could spoof any IP address. Use strong, unique passwords for each gateway, and restrict `ips` to the minimal necessary range.
+</Aside>
+
+- Use CIDR ranges carefully — overly broad ranges increase risk
+- If `verify_hostname: true`, the server validates that the provided hostname resolves back to the provided IP (reverse DNS check)
+- Consider restricting WebIRC gateways to specific listener ports

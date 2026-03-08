@@ -1,0 +1,164 @@
+---
+title: Installation
+description: How to install and run ElixIRCd from source or via Docker.
+sidebar:
+  order: 3
+---
+
+import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Option 1: Docker (Recommended)
+
+<Tabs>
+  <TabItem label="Basic (no config)">
+    ```bash
+    docker run \
+      -p 6667:6667 -p 6697:6697 -p 8080:8080 -p 8443:8443 \
+      faelgabriel/elixircd
+    ```
+  </TabItem>
+  <TabItem label="With custom config">
+    ```bash
+    docker run \
+      -p 6667:6667 -p 6697:6697 -p 8080:8080 -p 8443:8443 \
+      -v ./elixircd.exs:/app/config/elixircd.exs \
+      -v ./motd.txt:/app/config/motd.txt \
+      faelgabriel/elixircd
+    ```
+  </TabItem>
+  <TabItem label="With SSL certificates">
+    ```bash
+    docker run \
+      -p 6667:6667 -p 6697:6697 -p 8080:8080 -p 8443:8443 \
+      -v ./elixircd.exs:/app/config/elixircd.exs \
+      -v ./cert/:/app/data/cert/ \
+      faelgabriel/elixircd
+    ```
+  </TabItem>
+</Tabs>
+
+### Docker Remote Commands
+
+```bash
+# Open an interactive Elixir shell connected to the running server
+docker exec -it <container_name> ./bin/elixircd remote
+
+# Gracefully stop the server
+docker exec -it <container_name> ./bin/elixircd stop
+```
+
+---
+
+## Option 2: Building from Source
+
+### Requirements
+
+- **Elixir** 1.19 or newer
+- **Erlang/OTP** (compatible with your Elixir version)
+- **Git**
+
+We recommend using [asdf](https://asdf-vm.com/) to manage Elixir and Erlang versions.
+
+<Steps>
+
+1. **Install asdf plugins**
+
+   ```bash
+   asdf plugin-add erlang
+   asdf plugin-add elixir
+   ```
+
+2. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/faelgabriel/elixircd.git
+   cd elixircd
+   ```
+
+3. **Install the correct versions**
+
+   The `.tool-versions` file specifies the required Erlang and Elixir versions:
+
+   ```bash
+   asdf install
+   ```
+
+4. **Install dependencies**
+
+   ```bash
+   mix deps.get
+   ```
+
+5. **Build a production release**
+
+   ```bash
+   APP_VERSION=1.0.0 MIX_ENV=prod mix release
+   ```
+
+6. **Start the server**
+
+   ```bash
+   _build/prod/rel/elixircd/bin/elixircd start
+   ```
+
+</Steps>
+
+### Development Mode
+
+For development and debugging, start in interactive mode:
+
+```bash
+iex -S mix
+```
+
+This opens an IEx shell with the server running, allowing live interaction.
+
+### Running Tests
+
+```bash
+mix test --cover
+```
+
+### Code Quality Checks
+
+```bash
+mix quality
+```
+
+This runs compilation warnings, formatting, linting (Credo), security analysis (Sobelow), dependency audits, documentation checks, Dialyzer static analysis, and test coverage.
+
+---
+
+## Configuration Files
+
+After installation, the server looks for config files in these locations:
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `elixircd.exs` | `config/elixircd.exs` (source) or `/app/config/elixircd.exs` (Docker) | Main server configuration |
+| `motd.txt` | `config/motd.txt` or `/app/config/motd.txt` | Message of the Day |
+| SSL certificates | `data/cert/` or `/app/data/cert/` | TLS certificate files |
+
+<Aside type="tip">
+  In the Docker image, the config files are in `/app/config/`. Mount your custom files at these paths to override the defaults.
+</Aside>
+
+## Default Ports
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| `6667` | TCP | IRC plaintext |
+| `6697` | TLS | IRC with SSL/TLS |
+| `8080` | HTTP | WebSocket (IRC over WS) |
+| `8443` | HTTPS | WebSocket with SSL/TLS |
+
+<Aside type="note">
+  By default, ports 6697 and 8443 use auto-generated **self-signed certificates**. For production, replace them with real certificates. See the [SSL/TLS setup guide](/getting-started/tls-setup/).
+</Aside>
+
+## Building the Docker Image Locally
+
+```bash
+docker build -t elixircd .
+docker run -p 6667:6667 -p 6697:6697 -p 8080:8080 -p 8443:8443 elixircd
+```

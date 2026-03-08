@@ -1,0 +1,145 @@
+---
+title: Listeners
+description: Configuring network listeners and ports in ElixIRCd.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Listeners Block
+
+```elixir
+listeners: [
+  {:tcp, [port: 6667]},
+  {:tls, [
+    port: 6697,
+    transport_options: [
+      keyfile: Path.expand("data/cert/selfsigned_key.pem"),
+      certfile: Path.expand("data/cert/selfsigned.pem")
+    ]
+  ]},
+  {:http, [port: 8080]},
+  {:https, [
+    port: 8443,
+    keyfile: Path.expand("data/cert/selfsigned_key.pem"),
+    certfile: Path.expand("data/cert/selfsigned.pem")
+  ]}
+]
+```
+
+## Listener Types
+
+| Type | Protocol | Default Port | Underlying Server |
+|------|----------|-------------|-------------------|
+| `:tcp` | IRC plaintext | `6667` | ThousandIsland |
+| `:tls` | IRC with SSL/TLS | `6697` | ThousandIsland |
+| `:http` | WebSocket (plain) | `8080` | Bandit |
+| `:https` | WebSocket (SSL) | `8443` | Bandit |
+
+## TCP Listener
+
+```elixir
+{:tcp, [
+  port: 6667,
+  # Optional ThousandIsland options:
+  num_acceptors: 100,
+  num_connections: 10_000,
+]}
+```
+
+Standard plaintext IRC connection. Supports all IRC commands but not encrypted.
+
+## TLS Listener
+
+```elixir
+{:tls, [
+  port: 6697,
+  transport_options: [
+    keyfile: Path.expand("data/cert/privkey.pem"),
+    certfile: Path.expand("data/cert/fullchain.pem")
+    # Optional: add chain/CA cert
+  ],
+  # Optional ThousandIsland options:
+  num_acceptors: 100,
+]}
+```
+
+SSL/TLS encrypted IRC connection (RFC 7194). Users connecting via TLS receive the `+Z` (Secure Connection) user mode automatically.
+
+**Self-signed certificates:** If `keyfile` points to `selfsigned_key.pem` and `certfile` points to `selfsigned.pem`, ElixIRCd will **automatically generate** self-signed certificates on startup. This is for development only.
+
+## HTTP WebSocket Listener
+
+```elixir
+{:http, [
+  port: 8080,
+  # Optional Bandit options:
+  thousand_island_options: [
+    num_acceptors: 100,
+    num_connections: 10_000,
+  ]
+]}
+```
+
+Allows IRC clients to connect over WebSocket (WS). Compatible with web-based IRC clients like KiwiIRC.
+
+## HTTPS WebSocket Listener
+
+```elixir
+{:https, [
+  port: 8443,
+  keyfile: Path.expand("data/cert/privkey.pem"),
+  certfile: Path.expand("data/cert/fullchain.pem"),
+  # Optional Bandit options:
+  thousand_island_options: [...]
+]}
+```
+
+Encrypted WebSocket (WSS) listener. Users connecting via WSS receive the `+Z` (Secure Connection) mode.
+
+<Aside type="note">
+  The `keyfile` and `certfile` options for `:https` are top-level in the listener options (not nested under `transport_options`), unlike `:tls` which uses `transport_options`.
+</Aside>
+
+## Multiple Listeners
+
+You can configure multiple listeners of the same type on different ports:
+
+```elixir
+listeners: [
+  {:tcp, [port: 6667]},
+  {:tcp, [port: 6668]},    # Alternative port
+  {:tls, [port: 6697, transport_options: [...]]},
+  {:tls, [port: 6699, transport_options: [...]]},  # Alternative TLS port
+  {:http, [port: 8080]},
+  {:https, [port: 8443, keyfile: ..., certfile: ...]}
+]
+```
+
+## ThousandIsland Options
+
+For `:tcp` and `:tls` listeners, you can pass any [ThousandIsland option](https://hexdocs.pm/thousand_island/ThousandIsland.html#t:options/0):
+
+```elixir
+{:tcp, [
+  port: 6667,
+  num_acceptors: 100,        # Number of acceptor processes
+  num_connections: 10_000,   # Maximum connections
+  read_timeout: 60_000,      # Read timeout in milliseconds
+]}
+```
+
+## Bandit Options
+
+For `:http` and `:https` listeners, you can pass any [Bandit option](https://hexdocs.pm/bandit/Bandit.html#t:options/0):
+
+```elixir
+{:http, [
+  port: 8080,
+  thousand_island_options: [
+    num_acceptors: 100,
+    num_connections: 10_000,
+  ]
+]}
+```

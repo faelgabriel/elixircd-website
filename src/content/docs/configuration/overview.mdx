@@ -1,0 +1,78 @@
+---
+title: Configuration Overview
+description: Overview of the ElixIRCd configuration file and all configurable options.
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+ElixIRCd is configured via a single Elixir file: `elixircd.exs`. This file uses Elixir's `Config` module syntax.
+
+## File Location
+
+| Environment | Path |
+|-------------|------|
+| Source / dev | `config/elixircd.exs` |
+| Production release | `<release>/config/elixircd.exs` |
+| Docker | `/app/config/elixircd.exs` |
+
+## Configuration Sections
+
+The configuration file has the following top-level sections:
+
+| Section | Purpose |
+|---------|---------|
+| `server` | Server name, hostname, password, MOTD |
+| `rate_limiter` | Connection and message rate limiting |
+| `settings` | Case mapping, UTF-8 enforcement |
+| `cloaking` | Hostname cloaking settings |
+| `capabilities` | Enable/disable IRCv3 capabilities |
+| `monitor` | MONITOR command settings |
+| `sts` | Strict Transport Security |
+| `sasl` | SASL authentication settings |
+| `listeners` | Network ports and transports |
+| `user` | User-related limits |
+| `channel` | Channel-related limits |
+| `services` | NickServ and ChanServ settings |
+| `ident_service` | RFC 1413 ident lookup |
+| `webirc` | WebIRC gateway settings |
+| `admin_info` | Server admin contact info |
+| `operators` | IRC operator credentials |
+
+Additionally, there is a separate mailer configuration:
+- `ElixIRCd.Utils.Mailer` — email delivery settings
+
+## Template
+
+The full default configuration file is the best reference. You can find it at:
+- [GitHub: config/elixircd.exs](https://github.com/faelgabriel/elixircd/blob/main/config/elixircd.exs)
+
+## Applying Changes
+
+**During development:**
+Restart the application: `iex -S mix`
+
+**On a running Docker container:**
+If you changed `elixircd.exs`, use REHASH from IRC (as an operator):
+```irc
+/rehash
+```
+
+Or restart the container. Note: REHASH reloads configuration but active connections retain their state. Some config changes (like listener ports) may require a full restart.
+
+<Aside type="note">
+  The mailer configuration (`config :elixircd, ElixIRCd.Utils.Mailer`) controls how verification emails are sent. It uses the Bamboo library. The default adapter is `Bamboo.LocalAdapter` which stores emails locally (for development). For production, use `Bamboo.MuaAdapter` for SMTP delivery.
+</Aside>
+
+## Detailed Reference
+
+- [Server Settings](/configuration/server/)
+- [Listeners](/configuration/listeners/)
+- [Rate Limiting](/configuration/rate-limiting/)
+- [Hostname Cloaking](/configuration/cloaking/)
+- [Capabilities](/configuration/capabilities/)
+- [SASL Authentication](/configuration/sasl/)
+- [Services (NickServ/ChanServ)](/configuration/services/)
+- [WebIRC Gateways](/configuration/webirc/)
+- [IRC Operators](/configuration/operators/)

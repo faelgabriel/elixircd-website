@@ -1,0 +1,102 @@
+---
+title: Messaging Commands
+description: Commands for sending messages to users and channels.
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## PRIVMSG
+
+Send a private message to a user or a message to a channel.
+
+**Syntax:** `PRIVMSG <target> :<message>`
+
+**Targets:**
+- `<nickname>` — sends to that user directly
+- `<#channel>` — sends to everyone in the channel
+
+**Channel restrictions that block messages:**
+| Restriction | Condition |
+|-------------|-----------|
+| Not in channel | `+n` is set and you're not in the channel |
+| Moderated | `+m` is set and you don't have voice (`+v`) or op (`+o`) |
+| Registered only speak | `+M` is set and you're not registered (`+r`) |
+| No CTCP | `+C` is set and your message is a CTCP (`\x01...\x01`) |
+| No Colors | `+c` is set and your message contains IRC color codes |
+| No NOTICEs | `+T` is set (applies to NOTICE, not PRIVMSG) |
+| Delay message | `+d` is set and you joined too recently |
+| Banned | You're banned and no exception matches |
+
+**User-to-user restrictions:**
+| Restriction | Condition |
+|-------------|-----------|
+| Caller ID (`+g`) | Target has `+g` set and you're not on their ACCEPT list |
+| Registered only (`+R`) | Target has `+R` set and you're not registered (`+r`) |
+
+**Examples:**
+```irc
+PRIVMSG #general :Hello everyone!
+PRIVMSG Alice :Hi Alice, how are you?
+PRIVMSG #channel :ACTION dances     # /me action
+```
+
+**CTCP messages** use the format `\x01ACTION text\x01`:
+```irc
+PRIVMSG #channel :\x01ACTION waves hello\x01
+```
+
+<Aside type="note">
+  If you PRIVMSG a user with `+g` set and you're not on their accept list, the server sends you an `RPL_TARGUMODEG` or similar notice, and the target gets a `RPL_TARGNOTIFY` once per session per sender.
+</Aside>
+
+---
+
+## NOTICE
+
+Send a notice to a user or channel. Notices do not trigger automatic replies.
+
+**Syntax:** `NOTICE <target> :<message>`
+
+**Behavior:**
+- Same as PRIVMSG in terms of routing
+- The key difference: NOTICE messages should not generate automatic replies (used by bots, services)
+- If the channel has `+T` (No NOTICEs), NOTICE messages to the channel are blocked
+- CTCP replies are typically sent via NOTICE
+
+**Examples:**
+```irc
+NOTICE Alice :Please read the rules
+NOTICE #channel :Server maintenance at midnight
+```
+
+---
+
+## AWAY
+
+Set or clear your away status.
+
+**Syntax:** `AWAY [:<message>]`
+
+**Without message:** Clears your away status.
+**With message:** Sets you as away with the provided message.
+
+**Behavior:**
+- When away, anyone who PRIVMSG's you receives an automatic reply (301) with your away message
+- Other users with `AWAY-NOTIFY` capability are notified of your away status change
+- Your away status is visible in WHOIS
+
+**Constraints:**
+- Maximum away message length: 200 characters (configurable via `max_away_message_length`)
+
+**Examples:**
+```irc
+AWAY :Out for lunch, back in 30 minutes
+AWAY                                       # Clear away status
+```
+
+**Response when messaging an away user:**
+```
+:server 301 yournick theirnick :Out for lunch, back in 30 minutes
+```

@@ -1,0 +1,138 @@
+---
+title: Architecture
+description: How ElixIRCd works internally — connections, state, and the BEAM model.
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## The BEAM Model
+
+ElixIRCd is built on the **Erlang VM (BEAM)** through Elixir. The core architectural principle is that each user connection is handled by an independent lightweight process.
+
+- Each TCP/WebSocket connection spawns a dedicated BEAM process
+- Processes communicate via message passing — no shared mutable state
+- If one connection crashes, it doesn't affect others
+- The OTP supervisor tree automatically restarts failed processes
+
+This model allows ElixIRCd to handle thousands of concurrent connections efficiently without threads or callback hell.
+
+## In-Memory State
+
+All runtime state is stored in **Mnesia ETS tables** (via the `memento` library):
+
+| Table | Contents |
+|-------|---------|
+| `Users` | All connected users (registered and pre-registration) |
+| `Channels` | Active channels and their modes/topic |
+| `UserChannels` | Association between users and channels, with per-channel user modes |
+| `ChannelBans` | Ban masks for each channel (+b) |
+| `ChannelExcepts` | Exception masks (+e) |
+| `ChannelInvexes` | Invite exception masks (+I) |
+| `ChannelInvites` | Active invitations |
+| `RegisteredNicks` | NickServ-registered nicknames |
+| `RegisteredChannels` | ChanServ-registered channels |
+| `SaslSessions` | In-progress SASL authentication sessions |
+| `UserAccepts` | Per-user ACCEPT lists for Caller ID (+g) |
+| `UserSilences` | Per-user SILENCE lists |
+| `UserMonitors` | MONITOR target lists |
+| `HistoricalUsers` | WHOWAS history |
+| `Jobs` | Background job queue |
+| `Metrics` | Server metrics |
+
+<Aside type="caution">
+  **In-memory only**: by default, all data is lost when the server process exits. Registered nicknames and channels will be gone after a full restart. Mnesia can be configured for disk persistence, but this is not enabled by default.
+</Aside>
+
+## Connection Lifecycle
+
+Here is the full lifecycle of a user connection:
+
+```
+1. TCP/WebSocket connection accepted
+2. Rate limiter checks:
+   - Max connections per IP
+   - Connection rate (token bucket)
+3. User process spawned
+4. Pre-registration phase:
+   - PASS (optional)
+   - CAP LS / CAP REQ (optional, blocks registration until CAP END)
+   - AUTHENTICATE via SASL (optional, during CAP negotiation)
+   - NICK
+   - USER
+   - CAP END
+5. Handshake phase (when NICK + USER complete and not in CAP negotiation):
+   - Async: Reverse DNS lookup
+   - Async: Ident (RFC 1413) query (if ident_service.enabled = true)
+   - Password check (if server has a password)
+   - Apply connect modes (e.g., +x if cloak_on_connect = true)
+   - Mark user as registered
+6. Welcome sequence:
+   - 001 RPL_WELCOME
+   - 002 RPL_YOURHOST
+   - 003 RPL_CREATED
+   - 004 RPL_MYINFO
+   - LUSERS stats
+   - ISUPPORT (005 tokens)
+   - MOTD
+   - Current user modes (if any)
+   - Notify MONITOR watchers
+7. Normal operation (commands, messages)
+8. Disconnection (QUIT, KILL, inactivity timeout, or error)
+```
+
+## Listener Architecture
+
+ElixIRCd uses two different underlying servers for its listeners:
+
+- **ThousandIsland** — for TCP (`:tcp`) and TLS (`:tls`) connections
+- **Bandit** — for HTTP WebSocket (`:http`) and HTTPS WebSocket (`:https`) connections
+
+Both support tuning the number of acceptors and maximum connections.
+
+## Rate Limiting
+
+All connections pass through the rate limiter before being fully accepted:
+
+1. **Connection rate limiter** — token bucket per IP address
+   - Tracks connection frequency and enforces `max_connections_per_ip`
+   - Violations are tracked; after `block_threshold` violations, the IP is blocked for `block_ms`
+   - Exemptions by IP or CIDR range
+
+2. **Message rate limiter** — token bucket per user process
+   - Applied to each message received from a connected user
+   - Can be overridden per command via `command_throttle`
+   - After `disconnect_threshold` violations, the user is disconnected
+   - Exemptions by identified nickname, host mask, or user mode
+
+## Background Jobs
+
+ElixIRCd runs periodic background jobs:
+
+| Job | Purpose |
+|-----|---------|
+| `RegisteredNickExpiration` | Removes registered nicks inactive for `nick_expire_days` |
+| `RegisteredChannelExpiration` | Removes registered channels inactive for `channel_expire_days` |
+| `UnverifiedNickExpiration` | Removes unverified registrations after `unverified_expire_days` |
+| `SaslSessionExpiration` | Cleans up incomplete SASL sessions |
+| `ReservedNickCleanup` | Releases reserved nicknames (from REGAIN/RECOVER) |
+| `VerificationEmailDelivery` | Delivers email verification messages |
+
+## Server Notices (Snomask)
+
+Server operators with the `+s` user mode receive server notices. These include events like:
+
+- Client connections: `Client connecting: nick!ident@host (secure)`
+- Other server-level events
+
+The `+s` mode is restricted to IRC operators and configures the server notice mask (snomask).
+
+## Dispatcher
+
+All outgoing IRC messages go through the central `Dispatcher` module, which handles:
+
+- Broadcasting to individual users
+- Broadcasting to a list of users
+- Broadcasting as the server (using the server hostname as origin)
+- Broadcasting as a user (using the user's nick!ident@host as origin)

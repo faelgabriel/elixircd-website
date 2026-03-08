@@ -1,0 +1,116 @@
+---
+title: Quick Start
+description: Get ElixIRCd running in under 5 minutes using Docker.
+sidebar:
+  order: 1
+---
+
+import { Steps, Aside, Code, Tabs, TabItem } from '@astrojs/starlight/components';
+
+The fastest way to run ElixIRCd is with Docker. The official image is available on Docker Hub.
+
+## Docker Quick Start
+
+<Steps>
+
+1. **Run the server**
+
+   ```bash
+   docker run \
+     -p 6667:6667 -p 6697:6697 -p 8080:8080 -p 8443:8443 \
+     faelgabriel/elixircd
+   ```
+
+   This starts the server with default settings, exposing:
+   - `6667` — IRC plaintext
+   - `6697` — IRC SSL/TLS (self-signed cert by default)
+   - `8080` — WebSocket (HTTP)
+   - `8443` — WebSocket (HTTPS, self-signed cert)
+
+2. **Connect with an IRC client**
+
+   Open your IRC client and connect to `localhost:6667` (no password required by default).
+
+   ```
+   Server: localhost
+   Port: 6667
+   SSL: No
+   ```
+
+3. **You're in!**
+
+   You'll receive the welcome sequence, MOTD, and can start using the server:
+
+   ```irc
+   /nick YourNick
+   /join #test
+   /msg NickServ REGISTER yourpassword your@email.com
+   ```
+
+</Steps>
+
+<Aside type="tip">
+  For production use, always configure a custom `elixircd.exs` with proper settings, valid SSL certificates, and secure operator passwords.
+</Aside>
+
+## With Custom Configuration
+
+<Steps>
+
+1. **Download the default config**
+
+   Get the [default configuration file](https://github.com/faelgabriel/elixircd/blob/main/config/elixircd.exs) and save it as `elixircd.exs` locally.
+
+2. **Edit the config**
+
+   At minimum, change the server name and hostname:
+
+   ```elixir title="elixircd.exs"
+   config :elixircd,
+     server: [
+       name: "My IRC Network",
+       hostname: "irc.myserver.com",
+       password: nil,  # optional server password
+       motd: File.read("config/motd.txt")
+     ],
+   ```
+
+3. **Run with your config**
+
+   ```bash
+   docker run \
+     -p 6667:6667 -p 6697:6697 -p 8080:8080 -p 8443:8443 \
+     -v ./elixircd.exs:/app/config/elixircd.exs \
+     faelgabriel/elixircd
+   ```
+
+</Steps>
+
+## First Steps After Connecting
+
+Once connected, here's what to do:
+
+```irc
+# Set your nickname
+/nick MyNick
+
+# Register your nickname with NickServ
+/msg NickServ REGISTER mypassword myemail@example.com
+
+# Identify if already registered
+/msg NickServ IDENTIFY mypassword
+
+# Join a channel
+/join #general
+
+# Create a channel and register it with ChanServ
+/join #mychannel
+/msg ChanServ REGISTER #mychannel mypassword "My channel description"
+```
+
+## Next Steps
+
+- [Full installation guide](/getting-started/installation/) — building from source
+- [Configuration reference](/configuration/overview/) — all config options explained
+- [SSL/TLS setup](/getting-started/tls-setup/) — using real certificates
+- [Connecting clients](/getting-started/connecting-clients/) — client-specific guides

@@ -1,0 +1,116 @@
+---
+title: IRC Operators
+description: Configuring IRC operator credentials in ElixIRCd.
+sidebar:
+  order: 10
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+## Operators Block
+
+```elixir
+operators: [
+  # {"nickname", "argon2id_hash"}
+  {"admin", "$argon2id$v=19$m=4096,t=2,p=4$0Ikum7IgbC2CkId/UJQE7A$n1YVbtPj1nP4EfdL771tPCS1PmK+Q364g14ScJzBaSg"}
+]
+```
+
+The `operators` list is a list of `{name, password_hash}` tuples.
+
+| Field | Description |
+|-------|-------------|
+| `name` | The operator name used in the `OPER` command |
+| `password_hash` | An Argon2id hash of the password |
+
+## Generating Password Hashes
+
+<Steps>
+
+1. **Start an Elixir shell with ElixIRCd**
+
+   From source:
+   ```bash
+   iex -S mix
+   ```
+
+   Or via Docker:
+   ```bash
+   docker exec -it <container_name> ./bin/elixircd remote
+   ```
+
+2. **Generate the hash**
+
+   ```elixir
+   Argon2.hash_pwd_salt("your_secure_password")
+   ```
+
+   This outputs something like:
+   ```
+   "$argon2id$v=19$m=4096,t=2,p=4$randomsalt$hashvalue"
+   ```
+
+3. **Add to your config**
+
+   ```elixir
+   operators: [
+     {"admin", "$argon2id$v=19$m=4096,t=2,p=4$randomsalt$hashvalue"}
+   ]
+   ```
+
+</Steps>
+
+## Using OPER
+
+Once configured, connect to the server and authenticate:
+
+```irc
+/oper admin your_secure_password
+```
+
+On success:
+```
+:server 381 yournick :You are now an IRC Operator
+```
+
+<Aside type="caution">
+  **Never use plaintext passwords in the config file.** Always use Argon2id hashes.
+
+  The example hash in the default config is for the password `"admin"`. Replace it immediately before deploying.
+</Aside>
+
+<Aside type="tip">
+  Use the `OPER` command only over TLS connections. The password is transmitted as plaintext in the IRC protocol — TLS prevents interception.
+</Aside>
+
+## Multiple Operators
+
+You can configure multiple operator credentials:
+
+```elixir
+operators: [
+  {"admin", "$argon2id$...hash1..."},
+  {"netstaff", "$argon2id$...hash2..."},
+  {"backup_admin", "$argon2id$...hash3..."}
+]
+```
+
+All operator names are checked; the first matching one is used.
+
+## De-Opering
+
+To relinquish operator status:
+```irc
+/mode yournick -o
+```
+
+This removes `+o` and automatically removes any operator-only modes (`+H`, `+s`).
+
+## Security Best Practices
+
+1. **Use long, random passwords** — at least 16 characters
+2. **Use OPER over TLS only** — configure TLS listener and use port 6697
+3. **Limit who has oper access** — only trusted administrators
+4. **Don't share oper credentials** — each admin should have their own
+5. **Consider `+H` mode** — operators can use `/mode nick +H` to hide their IRC op status
+6. **Rotate passwords periodically** — regenerate hashes when operators leave

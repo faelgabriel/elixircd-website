@@ -1,0 +1,170 @@
+---
+title: Client Compatibility
+description: IRC client recommendations and configuration tips for connecting to ElixIRCd.
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+ElixIRCd implements standard IRC protocol (RFC 1459 / RFC 2812) with IRCv3 extensions. Any standard IRC client will work. Clients with IRCv3 support will get enhanced features.
+
+## Recommended Clients
+
+### Desktop
+
+| Client | Platform | IRCv3 Support | Notes |
+|--------|----------|--------------|-------|
+| [WeeChat](https://weechat.org/) | Linux/macOS/Windows | Excellent | Extensible via scripts; best for power users |
+| [HexChat](https://hexchat.github.io/) | Windows/Linux | Good | GUI client; easy SASL setup |
+| [irssi](https://irssi.org/) | Linux/macOS | Good | Terminal; scriptable |
+| [Textual](https://www.codeux.com/textual/) | macOS | Very good | Native macOS look |
+| [Konversation](https://konversation.kde.org/) | Linux (KDE) | Good | KDE-native |
+
+### Web / Browser
+
+| Client | Notes |
+|--------|-------|
+| [KiwiIRC](https://kiwiirc.com/) | Supports WebSocket; can self-host |
+| [TheLounge](https://thelounge.chat/) | Self-hosted bouncer-style; excellent IRCv3 |
+| [Gamja](https://git.sr.ht/~emersion/gamja) | Lightweight; WebSocket |
+
+### Mobile
+
+| Client | Platform |
+|--------|----------|
+| [Palaver](https://palaverapp.com/) | iOS |
+| [Mutter](https://github.com/Codeux-Software/Mutter) | iOS (by Textual devs) |
+| [Revolution IRC](https://github.com/MCMrARM/revolution-irc) | Android |
+| [Goguma](https://sr.ht/~emersion/goguma/) | Android |
+
+## Connecting to ElixIRCd
+
+### Basic Connection (Plain TCP)
+
+```
+Server: irc.example.com
+Port: 6667
+SSL/TLS: No
+Nick: YourNick
+```
+
+### TLS Connection (Recommended)
+
+```
+Server: irc.example.com
+Port: 6697
+SSL/TLS: Yes (verify certificate)
+Nick: YourNick
+```
+
+### WebSocket Connection
+
+```
+Server: wss://irc.example.com:8443
+Protocol: WebSocket
+Nick: YourNick
+```
+
+## SASL Configuration
+
+SASL lets you authenticate before completing registration. Configure it in your client before connecting.
+
+### WeeChat
+
+```
+/server add myserver irc.example.com/6697 -ssl
+/set irc.server.myserver.sasl_mechanism plain
+/set irc.server.myserver.sasl_username "YourNick"
+/set irc.server.myserver.sasl_password "yourpassword"
+/connect myserver
+```
+
+### HexChat
+
+1. Network List → Add server → `irc.example.com/6697`
+2. Edit → check **Use SSL**
+3. **Login Method**: SASL (username + password)
+4. Enter your username and password
+
+### irssi
+
+```
+/connect -ssl -sasl_mechanism plain -sasl_username YourNick -sasl_password yourpassword irc.example.com 6697
+```
+
+Or in `~/.irssi/config`:
+```
+{
+  address = "irc.example.com";
+  port = "6697";
+  use_ssl = "yes";
+  ssl_verify = "yes";
+  sasl_mechanism = "plain";
+  sasl_username = "YourNick";
+  sasl_password = "yourpassword";
+}
+```
+
+### Textual
+
+1. Preferences → Networks → Add
+2. Server: `irc.example.com`, Port: `6697`, SSL: checked
+3. Identity → Authentication: NickServ SASL
+4. Enter username and password
+
+## IRCv3 Features by Client
+
+| Feature | WeeChat | HexChat | irssi | TheLounge |
+|---------|---------|---------|-------|-----------|
+| SASL PLAIN | ✅ | ✅ | ✅ | ✅ |
+| away-notify | ✅ | ✅ | ✅ | ✅ |
+| extended-join | ✅ | ✅ | ✅ | ✅ |
+| account-notify | ✅ | partial | ✅ | ✅ |
+| message-tags | ✅ | partial | plugin | ✅ |
+| server-time | ✅ | ✅ | plugin | ✅ |
+| multi-prefix | ✅ | ✅ | ✅ | ✅ |
+| monitor | ✅ | ✅ | ✅ | ✅ |
+| msgid | ✅ | — | — | ✅ |
+| setname | ✅ | — | — | ✅ |
+
+<Aside type="note">
+  Clients that don't support a given capability simply won't request it. The server will still work normally — the client just won't receive the extra metadata that capability provides.
+</Aside>
+
+## Common Issues
+
+### "Cannot join channel" after SASL
+
+Some channels require you to be registered and identified. If you're not authenticating via SASL, use NickServ IDENTIFY after connecting:
+
+```
+/msg NickServ IDENTIFY yourpassword
+```
+
+### Certificate verification failures
+
+If you get SSL errors, ensure:
+1. The server's certificate is valid and not self-signed (or add it as a trusted cert)
+2. Your client has an up-to-date CA bundle
+3. The hostname in the certificate matches the server you're connecting to
+
+For self-signed certs during testing, you may need to disable verification (not recommended for production):
+
+```
+# WeeChat (dev/test only)
+/set irc.server.myserver.ssl_verify off
+```
+
+### Nick already in use
+
+If your nick is registered but you're not authenticated, another user (or a ghost of your previous connection) may hold it. Use:
+
+```
+/msg NickServ GHOST YourNick yourpassword
+/nick YourNick
+```
+
+### Slow connection / timeout during handshake
+
+ElixIRCd performs async DNS resolution and ident lookup during the connection handshake. This typically completes in under a second but can take up to the configured timeout if DNS or ident servers are slow or unreachable. Most clients handle this transparently.

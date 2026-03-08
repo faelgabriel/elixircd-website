@@ -1,0 +1,100 @@
+---
+title: Server Commands
+description: Commands for retrieving server information and status.
+sidebar:
+  order: 7
+---
+
+## MOTD
+
+Display the Message of the Day.
+
+**Syntax:** `MOTD`
+
+**Behavior:**
+- Returns the content of the configured `motd.txt` file
+- Automatically displayed during connection handshake
+- Returns `422 ERR_NOMOTD` if no MOTD is configured
+
+---
+
+## VERSION
+
+Get the server's version information.
+
+**Syntax:** `VERSION`
+
+**Response:**
+```
+:server 351 yournick ElixIRCd-X.Y.Z server.hostname :...
+```
+
+---
+
+## STATS
+
+Get server statistics.
+
+**Syntax:** `STATS <letter>`
+
+See [Operator Commands — STATS](/commands/operator/#stats) for available letters.
+
+---
+
+## INFO
+
+Get server information.
+
+**Syntax:** `INFO`
+
+**Returns:**
+- Server name, version, and build information
+- Server creation date
+- General operational information
+
+---
+
+## TIME
+
+Get the server's current local time.
+
+**Syntax:** `TIME`
+
+**Response:**
+```
+:server 391 yournick server.hostname :Day Mon DD HH:MM:SS YYYY
+```
+
+---
+
+## TRACE
+
+Trace the connection path to a user or server.
+
+**Syntax:** `TRACE [<target>]`
+
+**Behavior:**
+- Without arguments: shows the connection to the server
+- With a nick: traces the path to that user
+- Returns `200 RPL_TRACELINK`, `204 RPL_TRACEOPERATOR`, `205 RPL_TRACEUSER`, etc.
+
+---
+
+## ADMIN
+
+Get server administrator contact information.
+
+**Syntax:** `ADMIN`
+
+**Returns** (from `admin_info` config):
+- Server name and location
+- Organization name
+- Contact email address
+
+**Response:**
+```
+:server 256 yournick server.hostname :Administrative info
+:server 257 yournick :Server Location Here
+:server 258 yournick :Organization Name Here
+:server 259 yournick :admin@example.com
+```

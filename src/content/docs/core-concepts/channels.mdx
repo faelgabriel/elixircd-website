@@ -1,0 +1,134 @@
+---
+title: Channels
+description: How channels work in ElixIRCd — creation, modes, limits, and behavior.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Channel Basics
+
+Channels are virtual spaces where users can chat. A channel name must start with a **prefix character**:
+
+| Prefix | Type | Default join limit |
+|--------|------|--------------------|
+| `#` | Standard (public) channel | 20 per user |
+| `&` | Local channel | 5 per user |
+
+Channel names may contain letters (`a-z`, `A-Z`), digits (`0-9`), underscores (`_`), and hyphens (`-`). The maximum name length is 64 characters (excluding the prefix), configurable via `max_channel_name_length`.
+
+Examples of valid channel names: `#general`, `#my-project`, `&local-chat`
+
+## Channel Creation
+
+A channel is created automatically when the **first user joins** it. That user becomes the channel operator (`+o`) automatically.
+
+If the channel is registered with ChanServ, the founder's privileges and settings are applied when the channel is (re)created.
+
+## Channel Limits
+
+| Limit | Default | Config key |
+|-------|---------|-----------|
+| `#` channels per user | 20 | `channel_join_limits: %{"#" => 20}` |
+| `&` channels per user | 5 | `channel_join_limits: %{"&" => 5}` |
+| Max name length | 64 | `max_channel_name_length` |
+| Max topic length | 300 | `max_topic_length` |
+| Max kick message | 255 | `max_kick_message_length` |
+| Max modes per MODE command | 20 | `max_modes_per_command` |
+| Max ban entries (+b) | 100 | `max_list_entries: %{"b" => 100}` |
+
+## Channel Modes Overview
+
+| Mode | Name | Description |
+|------|------|-------------|
+| `+b` | Ban | Prevents matching users from joining |
+| `+C` | No CTCP | Blocks CTCP messages |
+| `+c` | No Colors | Blocks messages with IRC color codes |
+| `+d` | Delay Message | Users must wait N seconds before speaking after joining |
+| `+e` | Ban Exception | Exempts matching users from +b bans |
+| `+i` | Invite Only | Only invited users (or those matching +I) can join |
+| `+I` | Invite Exception | Exempts from +i invite requirement |
+| `+j` | Join Throttle | Limits join rate (`joins:seconds` format) |
+| `+k` | Key | Requires a password to join |
+| `+l` | Limit | Maximum number of users allowed |
+| `+m` | Moderated | Only voiced/opped users can speak |
+| `+M` | Registered Only Speak | Only registered users may speak |
+| `+n` | No External Messages | Messages only from users in the channel |
+| `+O` | Oper Only | Only IRC operators may join |
+| `+o` | Operator | Channel operator privileges (per-user) |
+| `+p` | Private | Hidden from LIST (but shown in WHOIS) |
+| `+r` | Registered | Channel is registered with ChanServ |
+| `+R` | Registered Only Join | Only registered users may join |
+| `+s` | Secret | Hidden from LIST and WHOIS |
+| `+t` | Topic Lock | Only ops can set the topic |
+| `+T` | No NOTICEs | Blocks NOTICE messages in the channel |
+| `+u` | Auditorium | Hides join/part/quit from non-voiced users |
+| `+v` | Voice | Can speak in moderated channels (per-user) |
+| `+z` | Secure Only | Only users with SSL/TLS (+Z) may join |
+
+See [Channel Modes](/modes/channel-modes/) for complete details on each mode.
+
+## Topic
+
+The channel topic is set with `/topic #channel New topic here`. Rules:
+
+- Maximum length: 300 characters (configurable)
+- When `+t` is set, only channel operators can change the topic
+- When a channel is registered with ChanServ and `KEEPTOPIC` is enabled (default), the topic is restored when the channel is re-created after becoming empty
+
+## Bans
+
+Bans (`+b`) use **IRC mask format**: `nick!ident@hostname`. Wildcards `*` and `?` are supported.
+
+```
++b *!*@192.168.1.100          # Ban by IP
++b BadUser!*@*                # Ban by nick
++b *!badident@*               # Ban by ident
++b *!*@*.spammer.net          # Ban by hostname pattern
+```
+
+**Ban exceptions** (`+e`) override bans for matching users. A user matching both a ban and an exception is allowed in.
+
+**Invite exceptions** (`+I`) allow users matching the mask to join invite-only (`+i`) channels without an explicit invite.
+
+## Join Throttle (+j)
+
+Join throttle format: `N:T` where `N` = max joins allowed per `T` seconds.
+
+```
++j 5:60     # Maximum 5 joins per 60 seconds
++j 3:10     # Maximum 3 joins per 10 seconds
+```
+
+IRC operators bypass join throttle restrictions.
+
+## Auditorium Mode (+u)
+
+When `+u` (Auditorium) is set:
+- Users with voice (`+v`) or higher can see join/part/quit messages normally
+- Regular users do not see join/part/quit messages from other regular users
+- This is useful for large channels or announcement-style rooms
+
+## Delay Message (+d)
+
+When `+d N` is set, users must wait `N` seconds after joining before they can send messages. This helps prevent join floods.
+
+## The +r (Registered) Channel Mode
+
+When a channel is registered with ChanServ, the `+r` mode is set by the server. This is informational — it tells users the channel has a registered owner.
+
+## Channel User Privileges
+
+Within a channel, users can have privilege modes:
+
+| Symbol | Mode | Description |
+|--------|------|-------------|
+| `@` | `+o` (Operator) | Full channel management: kick, ban, set modes, change topic |
+| `+` | `+v` (Voice) | Can speak in moderated (`+m`) channels |
+
+The first user to join a channel automatically receives `+o`. Channel operators can grant or remove these modes.
+
+<Aside type="tip">
+  Multiple prefixes are displayed when the `MULTI-PREFIX` capability is enabled. For example, a user who is both op and voice in a channel would show as `@+Nick`.
+</Aside>

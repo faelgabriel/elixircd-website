@@ -1,0 +1,202 @@
+---
+title: Server Management
+description: How to manage, configure, and maintain an ElixIRCd server.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Starting the Server
+
+### Development
+
+```bash
+mix deps.get
+mix run --no-halt
+```
+
+### Production with a Release
+
+```bash
+# Build a release
+MIX_ENV=prod mix release
+
+# Start in the background
+_build/prod/rel/elixircd/bin/elixircd daemon
+
+# Stop
+_build/prod/rel/elixircd/bin/elixircd stop
+
+# Attach to a running node
+_build/prod/rel/elixircd/bin/elixircd remote
+```
+
+### With Docker
+
+```bash
+docker run -d \
+  -p 6667:6667 \
+  -p 6697:6697 \
+  -v /etc/elixircd:/app/config \
+  elixircd/elixircd:latest
+```
+
+## Configuration File
+
+The primary configuration file is `config/elixircd.exs` (or wherever `RELEASE_COOKIE`/`MIX_ENV` points). After editing, reload with:
+
+```
+/rehash
+```
+
+REHASH re-reads the configuration file and applies changes to:
+- Server name/description/MOTD
+- Operator credentials
+- Rate limiting settings
+- Cloaking settings
+- WebIRC entries
+
+<Aside type="note">
+  Listener configuration changes (adding/removing ports) require a server restart — REHASH does not restart TCP/WebSocket listeners.
+</Aside>
+
+## MOTD Management
+
+The Message of the Day is stored in a file referenced by the config:
+
+```elixir
+config :elixircd, :server,
+  motd_file: "/etc/elixircd/motd.txt"
+```
+
+Edit the file and run `/rehash` to update the MOTD. Connected users see the new MOTD on their next `/motd` request or reconnect.
+
+## Operator Credential Rotation
+
+To update an operator password:
+
+1. Generate a new Argon2id hash:
+   ```elixir
+   Argon2.hash_pwd_salt("newpassword")
+   ```
+
+2. Update the `password` field in the oper config
+
+3. Run `/rehash`
+
+The old credentials are immediately invalidated. Active operator sessions keep their status until they de-oper or disconnect.
+
+## Managing TLS Certificates
+
+When certificates are renewed:
+
+1. Replace certificate and key files at the configured paths
+2. Restart the server (TLS listener changes require restart)
+
+For Let's Encrypt with auto-renewal, add a deploy hook:
+
+```bash
+# /etc/letsencrypt/renewal-hooks/deploy/elixircd.sh
+#!/bin/bash
+systemctl restart elixircd
+```
+
+## Systemd Service
+
+Example systemd unit for production:
+
+```ini
+[Unit]
+Description=ElixIRCd IRC Server
+After=network.target
+
+[Service]
+Type=forking
+User=elixircd
+Group=elixircd
+WorkingDirectory=/opt/elixircd
+ExecStart=/opt/elixircd/bin/elixircd daemon
+ExecStop=/opt/elixircd/bin/elixircd stop
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl enable elixircd
+sudo systemctl start elixircd
+```
+
+## Log Files
+
+ElixIRCd writes logs via Elixir's Logger. Default output is stdout/stderr captured by systemd or the release logger.
+
+Configure log level in `config/runtime.exs` or environment:
+
+```elixir
+config :logger, level: :info
+```
+
+Available levels: `:debug`, `:info`, `:warning`, `:error`
+
+## Backup and Persistence
+
+ElixIRCd uses **Mnesia** (via Memento) for persistent data storage:
+
+- Registered nicknames and accounts
+- Registered channels and their settings
+- Access lists, suspend records
+
+Mnesia stores data in the directory specified by `MNESIA_BASE` or the application's data directory. To back up:
+
+```bash
+# Stop the server first, or use Mnesia's online backup
+cp -r /var/lib/elixircd/Mnesia.elixircd@hostname /backup/
+```
+
+Or from an IEx session:
+
+```elixir
+:mnesia.backup('/backup/elixircd-backup')
+```
+
+## Upgrading
+
+1. Pull new code or download new release
+2. Review the changelog for breaking configuration changes
+3. Run `mix deps.get && mix compile` (or rebuild the release)
+4. Restart the server
+
+For zero-downtime upgrades in OTP hot-upgrade scenarios, consult the Elixir/OTP release documentation.
+
+## Checking Server Status
+
+From an IRC operator perspective:
+
+```
+/stats u      # Uptime and connection count
+/lusers       # User/channel/server counts
+/version      # Server version and build info
+/admin        # Admin contact info
+```
+
+From the system:
+
+```bash
+# Check if the port is listening
+ss -tlnp | grep 6697
+
+# Check the process
+ps aux | grep elixircd
+
+# Check memory usage
+_build/prod/rel/elixircd/bin/elixircd remote
+# Then in IEx:
+:erlang.memory()
+```

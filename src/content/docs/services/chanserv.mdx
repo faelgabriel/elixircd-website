@@ -1,0 +1,302 @@
+---
+title: ChanServ
+description: Complete reference for the ChanServ IRC service in ElixIRCd.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+ChanServ allows users to register and manage channels, providing channel administration and persistence services.
+
+## Getting Help
+
+```irc
+/msg ChanServ HELP
+/msg ChanServ HELP <command>
+```
+
+---
+
+## REGISTER
+
+Register a channel with ChanServ.
+
+**Syntax:** `REGISTER <#channel> <password> [<description>]`
+
+**Requirements:**
+- You must be identified with NickServ (`+r` mode)
+- You must be in the channel
+- You must be a channel operator (`+o`) in the channel
+- Password must be at least `min_password_length` characters (default: 8)
+- The channel must not already be registered
+- Channel name must not be in `forbidden_channel_names`
+- You cannot exceed `max_registered_channels_per_user` registered channels (default: 10)
+
+**Example:**
+```irc
+/msg ChanServ REGISTER #mychannel securepass8 "My project channel"
+```
+
+**After registration:**
+- The channel gets the `+r` mode (Registered)
+- ChanServ's guard bot may join if `GUARD` setting is enabled (default: on)
+- Default settings are applied (see settings below)
+
+---
+
+## DROP
+
+Permanently delete a registered channel.
+
+**Syntax:** `DROP <#channel> <password>`
+
+**Requirements:** Must be the channel founder (identified to the founder account)
+
+**Example:**
+```irc
+/msg ChanServ DROP #mychannel securepass8
+```
+
+<Aside type="caution">
+  This action is permanent and cannot be undone. All channel settings and registration data are deleted.
+</Aside>
+
+---
+
+## INFO
+
+Display information about a registered channel.
+
+**Syntax:** `INFO <#channel>`
+
+**Example:**
+```irc
+/msg ChanServ INFO #mychannel
+```
+
+**Returns:**
+- Channel name
+- Founder
+- Successor (if set)
+- Registration date
+- Last activity date
+- Description, URL, email (if set and not private)
+- Active settings (GUARD, KEEPTOPIC, etc.)
+
+---
+
+## SET
+
+Configure settings for your registered channel.
+
+**Syntax:** `SET <#channel> <option> [<value>]`
+
+**Requirements:** Must be identified as the channel founder
+
+### Available Settings
+
+#### GUARD
+
+Control whether ChanServ stays in the channel as a guard bot.
+
+```irc
+/msg ChanServ SET #channel GUARD ON     # ChanServ stays in channel (default)
+/msg ChanServ SET #channel GUARD OFF    # ChanServ leaves channel
+```
+
+When `GUARD` is `ON`, ChanServ remains in the channel to maintain its existence and apply settings.
+
+#### KEEPTOPIC
+
+Restore the topic when the channel is re-created after becoming empty.
+
+```irc
+/msg ChanServ SET #channel KEEPTOPIC ON    # Restore topic (default)
+/msg ChanServ SET #channel KEEPTOPIC OFF   # Don't restore topic
+```
+
+When `ON`, the last set topic is saved and restored automatically when the channel is re-created.
+
+#### PRIVATE
+
+Hide the channel from ChanServ's INFO listing.
+
+```irc
+/msg ChanServ SET #channel PRIVATE ON
+/msg ChanServ SET #channel PRIVATE OFF
+```
+
+#### RESTRICTED
+
+Restrict who can join to those with access.
+
+```irc
+/msg ChanServ SET #channel RESTRICTED ON
+/msg ChanServ SET #channel RESTRICTED OFF
+```
+
+When `ON`, only users with explicit access can join (similar to invite-only but managed by ChanServ).
+
+#### FANTASY
+
+Enable ChanServ fantasy commands (shortcut commands in the channel).
+
+```irc
+/msg ChanServ SET #channel FANTASY ON     # Enable fantasy (default)
+/msg ChanServ SET #channel FANTASY OFF    # Disable fantasy
+```
+
+When enabled, users can use `!command` shortcuts in the channel (e.g., `!op`, `!voice`).
+
+#### DESCRIPTION / DESC
+
+Set a description for the channel.
+
+```irc
+/msg ChanServ SET #channel DESCRIPTION "My awesome project channel"
+/msg ChanServ SET #channel DESC "Short desc"
+/msg ChanServ SET #channel DESCRIPTION    # View current description
+```
+
+#### URL
+
+Set a URL associated with the channel.
+
+```irc
+/msg ChanServ SET #channel URL https://myproject.example.com
+/msg ChanServ SET #channel URL OFF    # Remove URL
+/msg ChanServ SET #channel URL        # View current URL
+```
+
+#### EMAIL
+
+Set a contact email for the channel.
+
+```irc
+/msg ChanServ SET #channel EMAIL contact@example.com
+/msg ChanServ SET #channel EMAIL OFF    # Remove email
+/msg ChanServ SET #channel EMAIL       # View current email
+```
+
+#### ENTRYMSG
+
+Set a message shown to users when they join the channel.
+
+```irc
+/msg ChanServ SET #channel ENTRYMSG Welcome to #channel! Please read #rules.
+/msg ChanServ SET #channel ENTRYMSG OFF   # Remove entry message
+```
+
+#### OPNOTICE
+
+Whether to send a notice to the channel when ChanServ grants/removes operator status.
+
+```irc
+/msg ChanServ SET #channel OPNOTICE ON    # Notify on op changes (default)
+/msg ChanServ SET #channel OPNOTICE OFF
+```
+
+#### PEACE
+
+Prevent channel operators from kicking users with equal or higher access.
+
+```irc
+/msg ChanServ SET #channel PEACE ON
+/msg ChanServ SET #channel PEACE OFF    # Default
+```
+
+#### SECURE
+
+Require users to be identified with NickServ to receive operator access.
+
+```irc
+/msg ChanServ SET #channel SECURE ON
+/msg ChanServ SET #channel SECURE OFF    # Default
+```
+
+#### TOPICLOCK
+
+Prevent topic changes by users not identified with NickServ.
+
+```irc
+/msg ChanServ SET #channel TOPICLOCK ON
+/msg ChanServ SET #channel TOPICLOCK OFF    # Default
+```
+
+#### SUCCESSOR
+
+Set a successor who takes over the channel if the founder account expires.
+
+```irc
+/msg ChanServ SET #channel SUCCESSOR Alice
+/msg ChanServ SET #channel SUCCESSOR OFF    # Remove successor
+/msg ChanServ SET #channel SUCCESSOR       # View current successor
+```
+
+The successor must have a registered NickServ account.
+
+---
+
+## TRANSFER
+
+Transfer channel ownership to another user.
+
+**Syntax:** `TRANSFER <#channel> <nickname>`
+
+**Requirements:** Must be the channel founder (identified)
+
+**Example:**
+```irc
+/msg ChanServ TRANSFER #mychannel Alice
+```
+
+**Behavior:**
+- The target user becomes the new channel founder
+- The target user must have a registered NickServ account
+- This action is permanent (the current founder loses founder status)
+
+---
+
+## ChanServ Configuration Reference
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `enabled` | `true` | Enable/disable ChanServ |
+| `min_password_length` | `8` | Minimum registration password length |
+| `max_registered_channels_per_user` | `10` | Maximum channels a user can register |
+| `forbidden_channel_names` | `["#services", ~r/^#opers$/]` | Patterns/names that cannot be registered |
+| `channel_expire_days` | `90` | Days until inactive channels expire |
+| `settings.entrymsg` | `nil` | Default entry message |
+| `settings.keeptopic` | `true` | Default topic preservation |
+| `settings.opnotice` | `true` | Default op notice setting |
+| `settings.peace` | `false` | Default peace setting |
+| `settings.private` | `false` | Default private setting |
+| `settings.restricted` | `false` | Default restricted setting |
+| `settings.secure` | `false` | Default secure setting |
+| `settings.fantasy` | `true` | Default fantasy setting |
+| `settings.guard` | `true` | Default guard setting |
+| `settings.topiclock` | `false` | Default topic lock setting |
+
+See [Services Configuration](/configuration/services/) for full details.
+
+---
+
+## Not Yet Implemented
+
+The following ChanServ commands are planned but not yet implemented:
+
+| Command | Description |
+|---------|-------------|
+| `ACCESS` | Manage the channel access list |
+| `ALIST` | Display channel access list entries |
+| `FLAGS` | Manage user flags and permissions |
+| `OP` / `DEOP` | Grant/revoke operator status |
+| `VOICE` / `DEVOICE` | Grant/revoke voice status |
+| `KICK` | Kick a user from the channel |
+| `BAN` / `UNBAN` | Ban/unban users |
+| `INVITE` | Invite a user to the channel |
+| `TOPIC` | Set the channel topic |
+| `CLEAR` | Clear channel settings |
+| `STATUS` | Check a user's access level |
+| `SYNC` | Synchronize modes with access list |
