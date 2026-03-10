@@ -79,7 +79,7 @@ The included `Dockerfile` uses a multi-stage build: Bun builds the static site, 
 
 ```bash
 docker build -t elixircd-website .
-docker run -d -p 80:80 --name elixircd-website elixircd-website
+docker run -d -p 4000:80 --restart unless-stopped --name elixircd-website elixircd-website
 ```
 
 ## Contributing
