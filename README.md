@@ -1,6 +1,8 @@
-# ElixIRCd Documentation Site
+# ElixIRCd Website
 
-Static documentation site for [ElixIRCd](https://github.com/faelgabriel/elixircd), built with [Astro](https://astro.build) and [Starlight](https://starlight.astro.build).
+Official website for [ElixIRCd](https://github.com/faelgabriel/elixircd), including documentation, guides, and project information.
+
+https://www.elixircd.org
 
 ## Stack
 
@@ -23,32 +25,17 @@ Static documentation site for [ElixIRCd](https://github.com/faelgabriel/elixircd
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Start dev server at http://localhost:4321
-npm run dev
-
-# Type-check
-npm run check
+bun install        # Install dependencies
+bun run dev        # Start dev server at http://localhost:4321
+bun run check      # Type-check .astro and .mdx files
+bun run build      # Build static output to ./dist/
+bun run preview    # Preview the built site locally
 ```
-
-## Building
-
-```bash
-# Build static output to ./dist/
-npm run build
-
-# Preview the built site locally
-npm run preview
-```
-
-The built output in `dist/` is pure static HTML/CSS/JS — serve it with any static host or CDN.
 
 ## Project Structure
 
 ```
-docs-site/
+.
 ├── src/
 │   ├── assets/           # Logo SVGs
 │   ├── content/
@@ -88,30 +75,11 @@ docs-site/
 
 ## Deployment
 
-### Static hosting (Netlify, Vercel, GitHub Pages, S3, etc.)
+The included `Dockerfile` uses a multi-stage build: Bun builds the static site, then nginx serves it.
 
-Build command: `npm run build`
-Publish directory: `dist`
-
-### nginx
-
-```nginx
-server {
-    listen 80;
-    server_name docs.example.com;
-    root /var/www/elixircd-docs/dist;
-    index index.html;
-    location / {
-        try_files $uri $uri/ $uri/index.html =404;
-    }
-}
-```
-
-### Docker
-
-```dockerfile
-FROM nginx:alpine
-COPY dist /usr/share/nginx/html
+```bash
+docker build -t elixircd-website .
+docker run -d -p 80:80 --name elixircd-website elixircd-website
 ```
 
 ## Contributing
@@ -129,4 +97,4 @@ sidebar:
 # Content here
 ```
 
-All documentation is derived from the ElixIRCd source code. When adding or updating pages, verify against the actual implementation in `/lib/elixircd/`.
+All documentation is derived from the ElixIRCd source code. When adding or updating pages, verify against the actual implementation in the [ElixIRCd repository](https://github.com/faelgabriel/elixircd).
