@@ -4,6 +4,24 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
   integrations: [
     starlight({
+      head: [
+        {
+          tag: 'script',
+          attrs: {
+            src: 'https://www.googletagmanager.com/gtag/js?id=G-2MN5KV3902',
+            async: true,
+          },
+        },
+        {
+          tag: 'script',
+          content: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-2MN5KV3902');
+          `,
+        },
+      ],
       title: 'ElixIRCd',
       description: 'Documentation for ElixIRCd — a modern IRC server written in Elixir',
       logo: {
