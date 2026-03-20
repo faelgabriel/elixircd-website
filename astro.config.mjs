@@ -1,6 +1,8 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+const measurementId = 'G-2MN5KV3902';
+
 export default defineConfig({
   integrations: [
     starlight({
@@ -8,7 +10,7 @@ export default defineConfig({
         {
           tag: 'script',
           attrs: {
-            src: 'https://www.googletagmanager.com/gtag/js?id=G-2MN5KV3902',
+            src: `https://www.googletagmanager.com/gtag/js?id=${measurementId}`,
             async: true,
           },
         },
@@ -18,8 +20,16 @@ export default defineConfig({
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', 'G-2MN5KV3902');
+            window.gtag = window.gtag || gtag;
+            gtag('config', '${measurementId}', { send_page_view: false });
           `,
+        },
+        {
+          tag: 'script',
+          attrs: {
+            src: '/analytics.js',
+            defer: true,
+          },
         },
       ],
       title: 'ElixIRCd',
